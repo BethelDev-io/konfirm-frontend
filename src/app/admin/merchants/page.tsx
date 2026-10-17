@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE } from "@/lib/api";
+import { apiFetch, apiPatch, apiPost } from "@/lib/api";
 
 type RiskTier = "unverified" | "standard" | "established" | "enterprise";
 
@@ -33,9 +33,14 @@ export default function AdminMerchantsPage() {
   const [error, setError] = useState("");
 
   async function load() {
-    const res = await fetch(`${API_BASE}/admin/merchants`, { credentials: "include" });
-    if (res.ok) setMerchants(await res.json());
-    setLoading(false);
+    try {
+      const data = await apiFetch<Merchant[]>("/admin/merchants");
+      setMerchants(data);
+    } catch (err) {
+      console.error("[konfirm admin] merchants load failed", err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -54,16 +59,7 @@ export default function AdminMerchantsPage() {
     setPendingId(merchant.id);
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/admin/merchants/${merchant.id}/password-reset`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: reason.trim() }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || "Could not send the reset email.");
-      }
+      await apiPost(`/admin/merchants/${merchant.id}/password-reset`, { reason: reason.trim() });
       setError("");
       window.alert(`Reset link sent to ${merchant.email}.`);
     } catch (err) {
@@ -88,16 +84,10 @@ export default function AdminMerchantsPage() {
     setPendingId(merchant.id);
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/admin/merchants/${merchant.id}/status`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: nextStatus, reason: reason || undefined }),
+      await apiPatch(`/admin/merchants/${merchant.id}/status`, {
+        status: nextStatus,
+        reason: reason || undefined,
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || `Could not ${verb} this merchant.`);
-      }
       await load();
     } catch (err) {
       console.error("[konfirm admin] status change failed", err);
@@ -122,16 +112,7 @@ export default function AdminMerchantsPage() {
     setPendingId(merchant.id);
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/admin/merchants/${merchant.id}/tier`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ risk_tier: riskTier }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || "Could not change this merchant's tier.");
-      }
+      await apiPatch(`/admin/merchants/${merchant.id}/tier`, { risk_tier: riskTier });
       await load();
     } catch (err) {
       console.error("[konfirm admin] tier change failed", err);

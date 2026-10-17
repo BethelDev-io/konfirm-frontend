@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { API_BASE } from "@/lib/api";
+import { apiFetch, apiPost } from "@/lib/api";
 
 interface BlockedAddress {
   id: string;
@@ -25,9 +25,14 @@ export default function AdminCompliancePage() {
   const [error, setError] = useState("");
 
   async function load() {
-    const res = await fetch(`${API_BASE}/admin/compliance/blocked-addresses`, { credentials: "include" });
-    if (res.ok) setBlocked(await res.json());
-    setLoading(false);
+    try {
+      const data = await apiFetch<BlockedAddress[]>("/admin/compliance/blocked-addresses");
+      setBlocked(data);
+    } catch (err) {
+      console.error("[konfirm admin] load blocked addresses failed", err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -45,16 +50,10 @@ export default function AdminCompliancePage() {
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/admin/compliance/blocked-addresses`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stellar_address: address.trim(), reason: reason || undefined }),
+      await apiPost("/admin/compliance/blocked-addresses", {
+        stellar_address: address.trim(),
+        reason: reason || undefined,
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || "Could not block this address.");
-      }
       setAddress("");
       setReason("");
       await load();
@@ -71,14 +70,7 @@ export default function AdminCompliancePage() {
     setPendingId(entry.id);
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/admin/compliance/blocked-addresses/${entry.id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || "Could not unblock this address.");
-      }
+      await apiFetch(`/admin/compliance/blocked-addresses/${entry.id}`, { method: "DELETE" });
       await load();
     } catch (err) {
       console.error("[konfirm admin] unblock address failed", err);
