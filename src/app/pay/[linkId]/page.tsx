@@ -197,142 +197,113 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
       // path's own ambient watcher (started on page load) has no such
       // deadline, since there's no way to know when someone might finish
       // scanning.
-      const result = await pollForConfirmation(linkId, muxedId, 40, 2000);
-
-      if (result) {
-        showSuccess(result);
+      const payment = await pollForConfirmation(linkId, muxedId, 20, 1500);
+      if (payment) {
+        showSuccess(payment);
       } else {
-        setStatusMsg("Your payment was sent but hasn't been confirmed on Stellar yet. This can take a few minutes on a busy network. You don't need to pay again: the merchant will see it as soon as it confirms, and you can close this page.", true);
+        setStatusMsg("Your payment was sent. It may take a moment to show up here.");
       }
     } catch (err) {
-      console.error("[konfirm checkout]", err);
+      console.error("[konfirm checkout] connect flow failed", err);
       setStatusMsg(friendlyMessage(err), true);
     } finally {
       setConnecting(false);
     }
   }
 
+  function handleConnectSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (connecting) return;
+    void handleConnect();
+  }
+
   useEffect(() => {
     let cancelled = false;
-
     async function init() {
-      const res = await fetch(`${API_BASE}/links/${linkId}/public`);
-      if (cancelled) return;
-      if (!res.ok) {
-        setLoadingText("This payment link could not be found.");
-        return;
-      }
-      const data: LinkData = await res.json();
-      setLinkData(data);
       try {
-        sharedMuxedId.current = await reserveSessionWithRetry();
-      } catch (err) {
-        console.error("[konfirm checkout] could not reserve a payment session", err);
-        setStatusMsg(friendlyMessage(err), true);
-        setShowQr(false);
-        return;
-      }
-      // QR and mobile wallets pay the link amount. A platform fee on this
-      // link is owed by the merchant and settled from their dashboard
-      // (docs/design/qr-fee-collection.md, Option B), so it isn't added here.
-      await setupQrPayment(sharedMuxedId.current);
-      // Long, silent watch — up to 10 minutes — for the QR/mobile-wallet
-      // path, which has no "just submitted" moment to bound the wait
-      // against.
-      pollForConfirmation(linkId, sharedMuxedId.current, 300, 2000).then((result) => {
-        if (result) showSuccess(result);
-      });
-    }
+        const res = await fetch(`${API_BASE}/links/${linkId}`);
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.message || "link not found");
+        if (cancelled) return;
+        setLinkData(body);
 
-    init();
+        const muxedId = await reserveSessionWithRetry();
+        if (cancelled) return;
+        sharedMuxedId.current = muxedId;
+
+        await setupQrPayment(muxedId);
+        if (cancelled) return;
+
+        // Ambient watcher for the QR path — no deadline, since the payer
+        // may scan at any time.
+        void (async () => {
+          const payment = await pollForConfirmation(linkId, muxedId, 120, 3000);
+          if (payment) showSuccess(payment);
+        })();
+      } catch (err) {
+        console.error("[konfirm checkout] init failed", err);
+        if (!cancelled) setLoadingText(friendlyMessage(err));
+      }
+    }
+    void init();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkId]);
 
-  function formatCurrency(value: string, currency: string): string {
-    const str = Number(value).toFixed(2);
-    return currency === "USDC" ? `$${str}` : `${str} ${currency}`;
+  if (!linkData) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 p-6">
+        <p className="text-sm text-gray-500">{loadingText}</p>
+      </main>
+    );
   }
 
-  const amountDisplay = linkData ? formatCurrency(linkData.amount_usdc, linkData.currency) : "";
-  const feeUsdc = linkData?.fee_usdc ? Number(linkData.fee_usdc) : 0;
-  const feeDisplay = linkData && feeUsdc > 0 ? formatCurrency(linkData.fee_usdc as string, linkData.currency) : "";
-  const totalDisplay =
-    linkData && feeUsdc > 0
-      ? formatCurrency((Number(linkData.amount_usdc) + feeUsdc).toString(), linkData.currency)
-      : "";
+  if (confirmed) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 p-6">
+        <h1 className="text-2xl font-semibold">Payment confirmed</h1>
+        <p className="text-sm text-gray-500">
+          Thanks — your payment to {linkData.merchant_name} went through.
+        </p>
+        <p className="break-all text-xs text-gray-400">tx: {confirmed.tx_hash}</p>
+      </main>
+    );
+  }
 
   return (
-    <div className="page-center">
-      <div className="card">
-        <div className="brand" style={{ marginBottom: 24 }}>
-          <span className="mark">✓</span> Konfirm
-        </div>
+    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 p-6">
+      <header className="flex flex-col gap-1">
+        <p className="text-sm text-gray-500">Pay {linkData.merchant_name}</p>
+        <h1 className="text-2xl font-semibold">
+          {linkData.amount_usdc} {linkData.currency}
+        </h1>
+        {linkData.description && <p className="text-sm text-gray-500">{linkData.description}</p>}
+      </header>
 
-        {!linkData && !confirmed && <div>{loadingText}</div>}
+      {showQr && qrSvg && (
+        <section className="flex flex-col items-center gap-2">
+          <div className="rounded-lg bg-white p-2" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+          <a href={qrUri} className="text-xs text-blue-600 underline">
+            Open in your wallet
+          </a>
+        </section>
+      )}
 
-        {linkData && !confirmed && (
-          <div>
-            <div className="merchant-label">{linkData.merchant_name}</div>
-            <div className="desc-label">{linkData.description || "Payment"}</div>
-            {feeUsdc > 0 ? (
-              <>
-                <div className="amount-display">{totalDisplay}</div>
-                <div className="sub" style={{ marginTop: -8, marginBottom: 16 }}>
-                  {amountDisplay} + {feeDisplay} fee
-                </div>
-              </>
-            ) : (
-              <div className="amount-display">{amountDisplay}</div>
-            )}
+      <form onSubmit={handleConnectSubmit} className="flex flex-col gap-3">
+        <button
+          type="submit"
+          disabled={connecting}
+          className="rounded-lg bg-black px-4 py-2 text-white disabled:opacity-50"
+        >
+          {connecting ? "Connecting…" : "Connect wallet & pay"}
+        </button>
+      </form>
 
-            {showQr && (
-              <>
-                <div className="qr-section">
-                  <div className="qr-label">Scan with your Stellar wallet</div>
-                  {feeUsdc > 0 && (
-                    <div className="sub" style={{ marginBottom: 8 }}>
-                      Pay {amountDisplay} from your wallet. The platform fee is settled by the merchant.
-                    </div>
-                  )}
-                  <a
-                    className="qr-box"
-                    href={qrUri}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    dangerouslySetInnerHTML={{ __html: qrSvg }}
-                  />
-                  <div className="qr-hint">Lobstr, Vibrant, Beans, xBull, and others</div>
-                </div>
-                <div className="divider">or</div>
-              </>
-            )}
-
-            <button type="button" className="primary" disabled={connecting} onClick={handleConnect}>
-              Connect Freighter &amp; Pay
-            </button>
-            <div className={`status${statusIsError ? " error" : ""}`}>{status}</div>
-          </div>
-        )}
-
-        {confirmed && (
-          <div className="success-box">
-            <div className="tick">✓</div>
-            <div className="success-title">Konfirmed</div>
-            <div className="success-detail">Your payment landed and was konfirmed on-chain.</div>
-            <a
-              className="txlink"
-              href={`https://stellar.expert/explorer/testnet/tx/${confirmed.tx_hash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              View on stellar.expert →
-            </a>
-          </div>
-        )}
-      </div>
-    </div>
+      {status && (
+        <p className={`text-sm ${statusIsError ? "text-red-600" : "text-gray-500"}`}>{status}</p>
+      )}
+    </main>
   );
 }
