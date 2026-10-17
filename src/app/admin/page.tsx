@@ -37,7 +37,13 @@ function dayLabel(dateStr: string): string {
 // A small hand-rolled SVG area chart — this app has no charting dependency,
 // and one 7-point series doesn't need one. Real values in, real path out;
 // nothing here is decorative.
-function VolumeChart({ points }: { points: { date: string; net_usdc: string }[] }) {
+function VolumeChart({
+  points,
+  totalUsdc,
+}: {
+  points: { date: string; net_usdc: string }[];
+  totalUsdc: string;
+}) {
   const width = 640;
   const height = 160;
   const padding = 8;
@@ -54,8 +60,20 @@ function VolumeChart({ points }: { points: { date: string; net_usdc: string }[] 
   const linePath = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x},${y}`).join(" ");
   const areaPath = `${linePath} L${coords[coords.length - 1][0]},${height} L${coords[0][0]},${height} Z`;
 
+  const firstDate = points[0]?.date;
+  const lastDate = points[points.length - 1]?.date;
+  const rangeLabel =
+    firstDate && lastDate ? `${firstDate} to ${lastDate}` : "last 7 days";
+  const ariaLabel = `Payment volume chart, ${rangeLabel}: ${formatUsd(totalUsdc)} total net USDC across ${points.length} days.`;
+
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="volume-chart" preserveAspectRatio="none">
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="volume-chart"
+      preserveAspectRatio="none"
+      role="img"
+      aria-label={ariaLabel}
+    >
       <path d={areaPath} className="volume-chart-fill" />
       <path d={linePath} className="volume-chart-line" />
       {coords.map(([x, y], i) => (
@@ -129,7 +147,10 @@ export default function AdminOverviewPage() {
       <div className="admin-section">
         <h2>Payment volume, last 7 days ({formatUsd(stats.payments.last_7d_net_usdc)} total)</h2>
         <div className="chart-card">
-          <VolumeChart points={stats.daily_volume} />
+          <VolumeChart
+            points={stats.daily_volume}
+            totalUsdc={stats.payments.last_7d_net_usdc}
+          />
           <div className="chart-labels">
             {stats.daily_volume.map((p) => (
               <span key={p.date}>{dayLabel(p.date)}</span>
