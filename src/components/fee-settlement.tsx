@@ -43,17 +43,8 @@ export default function FeeSettlement({ address }: { address: string }) {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    fetch(`${API_BASE}/fees/owed`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((body: { totals: OwedTotal[] } | null) => {
-        if (!cancelled && body) setTotals(body.totals);
-      })
-      .catch((err) => console.error("[konfirm fees] could not load owed fees", err));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    load().catch((err) => console.error("[konfirm fees] could not load owed fees", err));
+  }, [load]);
 
   async function settle() {
     setBusy(true);
