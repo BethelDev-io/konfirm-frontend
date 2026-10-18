@@ -63,6 +63,15 @@ export default function CashoutPage() {
       merchantAddress.current = merchant.stellar_base_address;
     }
   }, [merchant]);
+
+  // Stop any in-flight polling when the component unmounts (e.g. the user
+  // navigates away mid cash-out) so no further requests or state updates
+  // happen after unmount.
+  useEffect(() => {
+    return () => {
+      cancelled.current = true;
+    };
+  }, []);
   const missingAddressStatus =
     merchant && !merchant.stellar_base_address ? "Add a Stellar address to your account before cashing out." : "";
 
@@ -79,6 +88,7 @@ export default function CashoutPage() {
   }
 
   async function sendWithdrawalPayment(token: string, id: string) {
+    if (cancelled.current) return;
     showProgress("Preparing the transfer…");
     const prepRes = await fetch(`${API_BASE}/withdrawals/prepare-payment`, {
       method: "POST",
@@ -86,14 +96,18 @@ export default function CashoutPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ currency, token, id }),
     });
+    if (cancelled.current) return;
     const prep = await prepRes.json();
+    if (cancelled.current) return;
     if (!prepRes.ok) throw new Error(prep.message || "could not prepare the transfer");
 
+    if (!merchantAddress.current) throw new Error("no Stellar address on file");
     showProgress("Approve the transfer in your wallet…");
     const signed = await freighterApi.signTransaction(prep.xdr, {
       networkPassphrase: prep.network_passphrase,
-      address: merchantAddress.current!,
+      address: merchantAddress.current,
     });
+    if (cancelled.current) return;
     if (signed.error) throw new Error(signed.error);
 
     showProgress("Sending your cash-out…");
@@ -102,7 +116,9 @@ export default function CashoutPage() {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: `tx=${encodeURIComponent(signed.signedTxXdr)}`,
     });
+    if (cancelled.current) return;
     const submitResult = await submitRes.json();
+    if (cancelled.current) return;
     if (!submitRes.ok) {
       const codes = submitResult.extras?.result_codes;
       throw new Error(codes ? JSON.stringify(codes) : submitResult.title || "submission failed");
@@ -112,7 +128,9 @@ export default function CashoutPage() {
   async function pollStatus(token: string, id: string) {
     while (!cancelled.current) {
       const res = await fetch(`${API_BASE}/withdrawals/status?token=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`);
+      if (cancelled.current) return;
       const txn = await res.json().catch(() => ({}));
+      if (cancelled.current) return;
       if (!res.ok) {
         showFormError(friendlyMessage(new Error(txn.message)));
         return;
@@ -131,13 +149,16 @@ export default function CashoutPage() {
         paymentSubmitted.current = true;
         try {
           await sendWithdrawalPayment(token, id);
+          if (cancelled.current) return;
         } catch (err) {
+          if (cancelled.current) return;
           console.error("[konfirm cashout] withdrawal payment failed", err);
           showFormError(friendlyMessage(err));
           return;
         }
       }
 
+      if (cancelled.current) return;
       const copy = STATUS_COPY[txn.status] ?? ["Working on it…", ""];
       showProgress(copy[0], copy[1]);
       await new Promise((r) => setTimeout(r, 3000));
@@ -145,24 +166,34 @@ export default function CashoutPage() {
   }
 
   async function handleStart() {
+    // Never begin the wallet/signing flow without a Stellar address on file.
+    if (!merchant?.stellar_base_address || !merchantAddress.current) {
+      setStatus(missingAddressStatus || "Add a Stellar address to your account before cashing out.");
+      return;
+    }
     setStarting(true);
     paymentSubmitted.current = false;
     cancelled.current = false;
     try {
       setStatus("Connecting your wallet…");
       const access = await freighterApi.requestAccess();
+      if (cancelled.current) return;
       if (access.error) throw new Error(access.error);
 
       showProgress("Requesting a secure sign-in…");
       const challengeRes = await fetch(`${API_BASE}/withdrawals/challenge`, { credentials: "include" });
+      if (cancelled.current) return;
       const challenge = await challengeRes.json();
+      if (cancelled.current) return;
       if (!challengeRes.ok) throw new Error(challenge.message || "could not reach the cash-out partner");
 
+      if (!merchantAddress.current) throw new Error("no Stellar address on file");
       showProgress("Approve the sign-in in your wallet…");
       const signedChallenge = await freighterApi.signTransaction(challenge.transaction, {
         networkPassphrase: challenge.network_passphrase,
-        address: merchantAddress.current!,
+        address: merchantAddress.current,
       });
+      if (cancelled.current) return;
       if (signedChallenge.error) throw new Error(signedChallenge.error);
 
       const tokenRes = await fetch(`${API_BASE}/withdrawals/token`, {
@@ -171,7 +202,9 @@ export default function CashoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transaction: signedChallenge.signedTxXdr }),
       });
+      if (cancelled.current) return;
       const tokenBody = await tokenRes.json();
+      if (cancelled.current) return;
       if (!tokenRes.ok) throw new Error(tokenBody.message || "the cash-out partner rejected that signature");
 
       showProgress("Opening the cash-out form…");
@@ -181,12 +214,15 @@ export default function CashoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currency, token: tokenBody.token }),
       });
+      if (cancelled.current) return;
       const startBody = await startRes.json();
+      if (cancelled.current) return;
       if (!startRes.ok) throw new Error(startBody.message || "could not start a cash-out");
 
       window.open(startBody.url, "konfirm-cashout", "width=460,height=700");
       pollStatus(tokenBody.token, startBody.id);
     } catch (err) {
+      if (cancelled.current) return;
       console.error("[konfirm cashout]", err);
       showFormError(friendlyMessage(err));
     }
@@ -229,10 +265,21 @@ export default function CashoutPage() {
             </div>
             <div className="limit-note">This test partner accepts between 1–10 units per cash-out.</div>
 
-            <button type="button" className="primary" disabled={starting} onClick={handleStart}>
+            <button
+              type="button"
+              className="primary"
+              disabled={starting || Boolean(missingAddressStatus)}
+              onClick={handleStart}
+            >
               Connect wallet &amp; start cash-out
             </button>
-            <div className={`status${status || missingAddressStatus ? " error" : ""}`}>{status || missingAddressStatus}</div>
+            <div
+              className={`status${status || missingAddressStatus ? " error" : ""}`}
+              role="alert"
+              aria-live={status || missingAddressStatus ? "assertive" : "polite"}
+            >
+              {status || missingAddressStatus}
+            </div>
           </div>
         )}
 

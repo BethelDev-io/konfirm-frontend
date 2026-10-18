@@ -209,6 +209,17 @@ button.secondary {
   margin-top: 10px;
 }
 
+/*
+ * Shared status / error message region (issue #45).
+ *
+ * Every form renders its feedback in a `.status` element. For screen readers
+ * to announce changes, the element must be a live region that already exists
+ * in the DOM before its text changes. Pages add `role="alert"` (or
+ * `aria-live="assertive"` for errors / `"polite"` for status) to the element;
+ * this rule keeps it rendered (min-height, never display:none / visibility:
+ * hidden / content collapsed) so the live region is present and observable
+ * even while empty.
+ */
 .status {
   font-size: 14px;
   color: var(--text-lo);
@@ -218,6 +229,13 @@ button.secondary {
 }
 .status.error {
   color: var(--error);
+}
+/* Never hide the live region: keep it in the accessibility tree at all times. */
+.status[aria-live],
+.status[role="alert"],
+.status[role="status"] {
+  display: block;
+  visibility: visible;
 }
 
 .hidden {

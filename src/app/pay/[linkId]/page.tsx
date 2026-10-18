@@ -313,7 +313,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
             <button type="button" className="primary" disabled={connecting} onClick={handleConnect}>
               Connect Freighter &amp; Pay
             </button>
-            <div className={`status${statusIsError ? " error" : ""}`}>{status}</div>
+            <div
+              className={`status${statusIsError ? " error" : ""}`}
+              role="alert"
+              aria-live={statusIsError ? "assertive" : "polite"}
+            >
+              {status}
+            </div>
           </div>
         )}
 
