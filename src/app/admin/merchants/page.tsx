@@ -18,7 +18,7 @@ interface Merchant {
 const RISK_TIERS: RiskTier[] = ["unverified", "standard", "established", "enterprise"];
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
+  return formatUtcTimestamp(iso);
 }
 
 function shortAddress(address: string | null): string {
@@ -79,7 +79,7 @@ export default function AdminMerchantsPage() {
       setError("");
       window.alert(`Reset link sent to ${merchant.email}.`);
     } catch (err) {
-      console.error("[konfirm admin] password reset failed", err);
+      reportError(err, { action: "admin.merchant.password_reset", merchantId: merchant.id });
       setError(err instanceof Error ? err.message : "Could not send the reset email.");
     } finally {
       setPendingId(null);
@@ -112,7 +112,7 @@ export default function AdminMerchantsPage() {
       }
       await load();
     } catch (err) {
-      console.error("[konfirm admin] status change failed", err);
+      reportError(err, { action: "admin.merchant.status_change", merchantId: merchant.id, status: nextStatus });
       setError(err instanceof Error ? err.message : `Could not ${verb} this merchant.`);
     } finally {
       setPendingId(null);
@@ -146,7 +146,7 @@ export default function AdminMerchantsPage() {
       }
       await load();
     } catch (err) {
-      console.error("[konfirm admin] tier change failed", err);
+      reportError(err, { action: "admin.merchant.tier_change", merchantId: merchant.id, riskTier });
       setError(err instanceof Error ? err.message : "Could not change this merchant's tier.");
     } finally {
       setPendingId(null);
@@ -173,7 +173,7 @@ export default function AdminMerchantsPage() {
                   <th>Status</th>
                   <th>Risk tier</th>
                   <th>Stellar address</th>
-                  <th>Created</th>
+                  <th>Created (UTC)</th>
                   <th></th>
                 </tr>
               </thead>

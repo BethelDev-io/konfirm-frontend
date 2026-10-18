@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatUtcTimestamp } from "@/lib/format";
 
 interface WithdrawalAttempt {
   id: string;
@@ -16,9 +17,6 @@ interface WithdrawalAttempt {
 
 const TERMINAL_STATUSES = new Set(["completed", "error", "expired", "refunded"]);
 
-function formatDate(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString() : "—";
-}
 
 export default function AdminWithdrawalsPage() {
   const [attempts, setAttempts] = useState<WithdrawalAttempt[]>([]);

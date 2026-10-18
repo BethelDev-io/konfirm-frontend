@@ -14,10 +14,6 @@ interface ReferralRow {
   activated: boolean;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
-
 export default function AdminReferralsPage() {
   const [referrals, setReferrals] = useState<ReferralRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,7 +76,7 @@ export default function AdminReferralsPage() {
                         {r.activated ? "Active" : "Signed up"}
                       </span>
                     </td>
-                    <td>{formatDate(r.created_at)}</td>
+                    <td>{formatUtcTimestamp(r.created_at)}</td>
                   </tr>
                 ))}
               </tbody>

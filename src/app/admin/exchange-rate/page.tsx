@@ -21,9 +21,8 @@ function shortAddress(address: string): string {
   return `${address.slice(0, 4)}…${address.slice(-4)}`;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
+
+const CONVERSIONS_PAGE_SIZE = 50;
 
 export default function AdminExchangeRatePage() {
   const [live, setLive] = useState<LiveRate | null>(null);
@@ -43,6 +42,17 @@ export default function AdminExchangeRatePage() {
       setLoading(false);
     })();
   }, []);
+
+  async function handleLoadMore() {
+    setLoadingMore(true);
+    try {
+      const rows = await loadConversions(conversions.length);
+      setConversions((prev) => [...prev, ...rows]);
+      setHasMore(rows.length === CONVERSIONS_PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <div>
@@ -94,12 +104,17 @@ export default function AdminExchangeRatePage() {
                         <td className="mono">{shortAddress(c.payer_address)}</td>
                         <td className="mono">{Number(c.fx_rate_to_usd).toFixed(7)}</td>
                         <td className="mono">${Number(c.amount_usdc).toFixed(2)}</td>
-                        <td>{formatDate(c.created_at)}</td>
+                        <td>{formatUtcTimestamp(c.created_at)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+            )}
+            {hasMore && (
+              <button type="button" onClick={handleLoadMore} disabled={loadingMore} style={{ marginTop: 12 }}>
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
             )}
           </div>
         </>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatUtcTimestamp } from "@/lib/format";
 
 type SettlementStatus = "settled" | "failed" | "held";
 
@@ -18,10 +19,6 @@ interface Settlement {
 }
 
 const STATUS_OPTIONS: SettlementStatus[] = ["settled", "failed", "held"];
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
 
 // x402 USDC amounts arrive in atomic units (7 decimals), unlike the
 // existing payments table's already-decimal amount_usdc.
@@ -136,7 +133,7 @@ export default function AdminX402SettlementsPage() {
                       <span className={`status-pill ${s.status}`}>{s.status}</span>
                     </td>
                     <td className="mono">{s.tx_hash ? shortAddress(s.tx_hash) : "—"}</td>
-                    <td>{formatDate(s.created_at)}</td>
+                    <td>{formatUtcTimestamp(s.created_at)}</td>
                   </tr>
                 ))}
               </tbody>

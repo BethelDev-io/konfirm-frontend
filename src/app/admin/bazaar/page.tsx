@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch, apiPatch } from "@/lib/api";
+import { formatUtcTimestamp } from "@/lib/format";
 
 type ListingStatus = "pending" | "approved" | "rejected";
 
@@ -22,7 +23,7 @@ interface Listing {
 const STATUS_OPTIONS: ListingStatus[] = ["pending", "approved", "rejected"];
 
 function formatDate(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString() : "—";
+  return iso ? formatUtcTimestamp(iso) : "—";
 }
 
 export default function AdminBazaarPage() {
@@ -33,6 +34,7 @@ export default function AdminBazaarPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function load(status: string) {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
     const result = await apiFetch<Listing[]>(status ? `/admin/bazaar-listings?status=${status}` : "/admin/bazaar-listings");
@@ -112,7 +114,7 @@ export default function AdminBazaarPage() {
                   <th>Network</th>
                   <th>Contact</th>
                   <th>Status</th>
-                  <th>Submitted</th>
+                  <th>Submitted (UTC)</th>
                   <th></th>
                 </tr>
               </thead>

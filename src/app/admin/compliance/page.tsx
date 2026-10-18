@@ -11,9 +11,6 @@ interface BlockedAddress {
   blocked_by_name: string | null;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
 
 export default function AdminCompliancePage() {
   const [blocked, setBlocked] = useState<BlockedAddress[]>([]);
@@ -65,7 +62,7 @@ export default function AdminCompliancePage() {
       setReason("");
       await load();
     } catch (err) {
-      console.error("[konfirm admin] block address failed", err);
+      reportError(err, { tags: { area: "admin-compliance", action: "block-address" } });
       setError(err instanceof Error ? err.message : "Could not block this address.");
     } finally {
       setSubmitting(false);
@@ -87,7 +84,7 @@ export default function AdminCompliancePage() {
       }
       await load();
     } catch (err) {
-      console.error("[konfirm admin] unblock address failed", err);
+      reportError(err, { tags: { area: "admin-compliance", action: "unblock-address" } });
       setError(err instanceof Error ? err.message : "Could not unblock this address.");
     } finally {
       setPendingId(null);
@@ -149,7 +146,7 @@ export default function AdminCompliancePage() {
                     <td className="mono">{b.stellar_address}</td>
                     <td>{b.reason || "—"}</td>
                     <td>{b.blocked_by_name || "—"}</td>
-                    <td>{formatDate(b.created_at)}</td>
+                    <td>{formatUtcTimestamp(b.created_at)}</td>
                     <td>
                       <button type="button" disabled={pendingId === b.id} onClick={() => handleUnblock(b)}>
                         Unblock

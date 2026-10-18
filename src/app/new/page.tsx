@@ -4,7 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiPost } from "@/lib/api";
+import { reportError } from "@/lib/reportError";
 import { useRequireAuth } from "@/lib/useAuth";
+
+const RECENT_LINK_KEY = "konfirm:recentLink";
 
 type Currency = "XLM" | "USDC" | "EURC";
 
@@ -56,10 +59,16 @@ export default function NewPaymentPage() {
         throw new Error(typeof bodyMessage === "string" ? bodyMessage : "Could not create that payment link.");
       }
 
-      setLinkUrl(`${window.location.origin}/pay/${result.data.id}`);
+      const url = `${window.location.origin}/pay/${result.data.id}`;
+      setLinkUrl(url);
       setShowResult(true);
+      try {
+        window.localStorage.setItem(RECENT_LINK_KEY, url);
+      } catch {
+        // localStorage may be unavailable (private mode, quota); the link is still shown.
+      }
     } catch (err) {
-      console.error("[konfirm new-payment]", err);
+      reportError(err, { tags: { area: "new-payment", action: "create-link" } });
       setStatus(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
@@ -67,9 +76,15 @@ export default function NewPaymentPage() {
   }
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(linkUrl);
-    setCopyLabel("Copied");
-    setTimeout(() => setCopyLabel("Copy"), 1500);
+    try {
+      await navigator.clipboard.writeText(linkUrl);
+      setStatus("");
+      setCopyLabel("Copied");
+      setTimeout(() => setCopyLabel("Copy"), 1500);
+    } catch (err) {
+      console.error("[konfirm new-payment] clipboard", err);
+      setStatus("Couldn't copy — select and copy the link manually.");
+    }
   }
 
   function handleAnother() {
@@ -87,6 +102,9 @@ export default function NewPaymentPage() {
           </div>
           <Link className="back" href="/activity">
             ← Activity
+          </Link>
+          <Link className="back" href="/links">
+            My links
           </Link>
         </div>
 
@@ -115,6 +133,7 @@ export default function NewPaymentPage() {
                   key={c}
                   type="button"
                   className={`ctoggle${currency === c ? " active" : ""}`}
+                  aria-pressed={currency === c}
                   onClick={() => setCurrency(c)}
                 >
                   {c}
@@ -149,7 +168,7 @@ export default function NewPaymentPage() {
         ) : (
           <div className="success-box">
             <div className="tick">✓</div>
-            <div className="success-title">Ready to send</div>
+            <h1 className="success-title">Ready to send</h1>
             <div className="success-detail">Share this link, or open it yourself to test it now.</div>
             <div className="link-box">
               <span>{linkUrl}</span>
@@ -157,12 +176,16 @@ export default function NewPaymentPage() {
                 {copyLabel}
               </button>
             </div>
+            <div className={`status${status ? " error" : ""}`}>{status}</div>
             <button type="button" className="primary" onClick={() => window.location.assign(linkUrl)}>
               Open checkout
             </button>
             <button type="button" className="secondary" onClick={handleAnother}>
               Request another payment
             </button>
+            <Link className="secondary" href="/links">
+              View my payment links
+            </Link>
           </div>
         )}
       </div>

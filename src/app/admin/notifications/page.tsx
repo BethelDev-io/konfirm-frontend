@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatUtcTimestamp } from "@/lib/format";
 
 type Severity = "critical" | "warning" | "info";
 
@@ -11,10 +12,6 @@ interface Notification {
   severity: Severity;
   message: string;
   created_at: string;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
 }
 
 export default function AdminNotificationsPage() {
@@ -75,7 +72,7 @@ export default function AdminNotificationsPage() {
           <ul className="activity-feed">
             {items.map((n) => (
               <li key={`${n.type}-${n.id}`}>
-                <span className="when">{formatDate(n.created_at)}</span>
+                <span className="when">{formatUtcTimestamp(n.created_at)}</span>
                 <span className={`status-pill ${n.severity === "critical" ? "failed" : n.severity === "warning" ? "held" : "active"}`}>
                   {n.severity}
                 </span>{" "}

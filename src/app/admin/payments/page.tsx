@@ -33,7 +33,7 @@ const FLAG_LABEL: Record<string, string> = {
 };
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
+  return formatUtc(iso);
 }
 
 function formatAmount(amount: string, code: string): string {
@@ -110,7 +110,7 @@ export default function AdminPaymentsPage() {
       }
       await load(filter);
     } catch (err) {
-      console.error("[konfirm admin] payment status change failed", err);
+      reportError(err, { scope: "admin-payments", action: "payment-status-change", paymentId: payment.id });
       setError(err instanceof Error ? err.message : "Could not update this payment.");
     } finally {
       setPendingId(null);

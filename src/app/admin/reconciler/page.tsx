@@ -2,6 +2,8 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { API_BASE } from "@/lib/api";
+import { reportError } from "@/lib/report-error";
+import { formatUtcTimestamp } from "@/lib/format-date";
 
 interface ReconcilerStatus {
   value: string | null;
@@ -9,7 +11,7 @@ interface ReconcilerStatus {
 }
 
 function formatDate(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString() : "—";
+  return iso ? formatUtcTimestamp(iso) : "—";
 }
 
 // Mirrors the backend's own guard (AdminReconcilerService) so an operator
@@ -78,7 +80,7 @@ export default function AdminReconcilerPage() {
       setTarget("");
       await load();
     } catch (err) {
-      console.error("[konfirm admin] reconciler rewind failed", err);
+      reportError(err, { context: "admin reconciler rewind failed" });
       setError(err instanceof Error ? err.message : "Could not rewind the cursor.");
     } finally {
       setSubmitting(false);

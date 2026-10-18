@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatUtcDateTime } from "@/lib/format";
 
 interface PayLink {
   id: string;
@@ -18,9 +19,6 @@ interface PayLink {
   net_usdc: string;
 }
 
-function formatDate(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString() : "—";
-}
 
 function formatAmount(link: PayLink): string {
   if (link.amount_usdc === null) return "Any amount";
@@ -110,7 +108,7 @@ export default function AdminPayLinksPage() {
                     <td>
                       <span className={`status-pill ${l.active ? "active" : "suspended"}`}>{l.active ? "active" : "inactive"}</span>
                     </td>
-                    <td>{formatDate(l.created_at)}</td>
+                    <td>{formatUtcDateTime(l.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
