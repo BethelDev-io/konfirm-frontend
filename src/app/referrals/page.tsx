@@ -64,6 +64,9 @@ export default function ReferralsPage() {
   const [data, setData] = useState<ReferralsResponse | null>(null);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
+  const [copyAnnouncement, setCopyAnnouncement] = useState("");
+
+  const COPY_FEEDBACK_MS = 4000;
 
   useEffect(() => {
     if (!resolved) return;
@@ -83,7 +86,11 @@ export default function ReferralsPage() {
       await navigator.clipboard.writeText(referralUrl);
       setCopyError(false);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopyAnnouncement("Referral link copied to clipboard.");
+      setTimeout(() => {
+        setCopied(false);
+        setCopyAnnouncement("");
+      }, COPY_FEEDBACK_MS);
     } catch {
       setCopied(false);
       setCopyError(true);
@@ -109,6 +116,9 @@ export default function ReferralsPage() {
               <button type="button" onClick={copyLink}>
                 {copied ? "Copied!" : "Copy link"}
               </button>
+            </div>
+            <div role="status" aria-live="polite" aria-atomic="true" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap" }}>
+              {copyAnnouncement}
             </div>
             {copyError && (
               <div className="hint" role="alert" style={{ marginTop: 8 }}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiPost } from "@/lib/api";
@@ -8,6 +8,9 @@ import { reportError } from "@/lib/reportError";
 import { useRequireAuth } from "@/lib/useAuth";
 
 const RECENT_LINK_KEY = "konfirm:recentLink";
+const DRAFT_KEY = "konfirm:newPaymentDraft";
+
+const COPY_FEEDBACK_MS = 4000;
 
 type Currency = "XLM" | "USDC" | "EURC";
 
@@ -31,7 +34,40 @@ export default function NewPaymentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [copyLabel, setCopyLabel] = useState("Copy");
+  const [copyAnnouncement, setCopyAnnouncement] = useState("");
   const [showResult, setShowResult] = useState(false);
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Restore draft from sessionStorage on mount
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw) as { amount?: string; currency?: Currency; description?: string };
+        if (draft.amount) setAmount(draft.amount);
+        if (draft.currency && (["XLM", "USDC", "EURC"] as Currency[]).includes(draft.currency)) setCurrency(draft.currency);
+        if (draft.description) setDescription(draft.description);
+      }
+    } catch {
+      // sessionStorage unavailable or corrupt — start blank
+    }
+  }, []);
+
+  // Persist draft to sessionStorage on change, debounced
+  useEffect(() => {
+    if (showResult) return;
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      try {
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ amount, currency, description }));
+      } catch {
+        // sessionStorage unavailable — ignore
+      }
+    }, 300);
+    return () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    };
+  }, [amount, currency, description, showResult]);
 
   async function handleSubmit() {
     const amountRaw = amount.trim();
@@ -67,6 +103,11 @@ export default function NewPaymentPage() {
       } catch {
         // localStorage may be unavailable (private mode, quota); the link is still shown.
       }
+      try {
+        sessionStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // sessionStorage unavailable — ignore
+      }
     } catch (err) {
       reportError(err, { tags: { area: "new-payment", action: "create-link" } });
       setStatus(err instanceof Error ? err.message : "Something went wrong. Please try again.");
@@ -80,7 +121,11 @@ export default function NewPaymentPage() {
       await navigator.clipboard.writeText(linkUrl);
       setStatus("");
       setCopyLabel("Copied");
-      setTimeout(() => setCopyLabel("Copy"), 1500);
+      setCopyAnnouncement("Link copied to clipboard.");
+      setTimeout(() => {
+        setCopyLabel("Copy");
+        setCopyAnnouncement("");
+      }, COPY_FEEDBACK_MS);
     } catch (err) {
       console.error("[konfirm new-payment] clipboard", err);
       setStatus("Couldn't copy — select and copy the link manually.");
@@ -91,6 +136,11 @@ export default function NewPaymentPage() {
     setAmount("");
     setDescription("");
     setShowResult(false);
+    try {
+      sessionStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // sessionStorage unavailable — ignore
+    }
   }
 
   return (
@@ -175,6 +225,9 @@ export default function NewPaymentPage() {
               <button type="button" onClick={handleCopy}>
                 {copyLabel}
               </button>
+            </div>
+            <div role="status" aria-live="polite" aria-atomic="true" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap" }}>
+              {copyAnnouncement}
             </div>
             <div className={`status${status ? " error" : ""}`}>{status}</div>
             <button type="button" className="primary" onClick={() => window.location.assign(linkUrl)}>
