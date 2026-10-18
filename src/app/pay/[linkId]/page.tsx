@@ -98,7 +98,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
   ): Promise<ConfirmedPayment | null> {
     for (let i = 0; i < attempts; i++) {
       if (alreadyConfirmed.current) return null;
-      const res = await fetch(`${API_BASE}/links/${pollLinkId}/sessions/${muxedId}`);
+      // Always-fresh read: this loop polls for payment confirmation, so a
+      // cached/stale response could show "pending" long after the payment
+      // has actually confirmed on-chain.
+      const res = await fetch(`${API_BASE}/links/${pollLinkId}/sessions/${muxedId}`, { cache: "no-store" });
       if (res.ok) {
         const body: { confirmed: boolean; payment: { tx_hash: string } | null } = await res.json();
         if (body.confirmed && body.payment) return { tx_hash: body.payment.tx_hash, muxed_id: muxedId };
