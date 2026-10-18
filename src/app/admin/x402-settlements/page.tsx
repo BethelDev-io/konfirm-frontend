@@ -34,21 +34,36 @@ function shortAddress(address: string): string {
   return address.length > 12 ? `${address.slice(0, 4)}…${address.slice(-4)}` : address;
 }
 
+const PAGE_SIZE = 50;
+
 export default function AdminX402SettlementsPage() {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [filter, setFilter] = useState<"" | SettlementStatus>("");
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
-  async function load() {
-    setLoading(true);
-    const result = await apiFetch<Settlement[]>("/admin/x402-settlements");
-    if (result.ok) setSettlements(result.data);
+  async function load(nextOffset: number) {
+    if (nextOffset === 0) setLoading(true);
+    else setLoadingMore(true);
+    const params = new URLSearchParams({
+      limit: String(PAGE_SIZE),
+      offset: String(nextOffset),
+    });
+    const result = await apiFetch<Settlement[]>(`/admin/x402-settlements?${params.toString()}`);
+    if (result.ok) {
+      setSettlements((prev) => (nextOffset === 0 ? result.data : [...prev, ...result.data]));
+      setOffset(nextOffset + result.data.length);
+      setHasMore(result.data.length === PAGE_SIZE);
+    }
     setLoading(false);
+    setLoadingMore(false);
   }
 
   useEffect(() => {
     (async () => {
-      await load();
+      await load(0);
     })();
   }, []);
 
@@ -106,34 +121,48 @@ export default function AdminX402SettlementsPage() {
         ) : visible.length === 0 ? (
           <div className="empty">No settlements match this filter.</div>
         ) : (
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Payer</th>
-                  <th>Pay to</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Tx hash</th>
-                  <th>Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((s) => (
-                  <tr key={s.id}>
-                    <td className="mono">{shortAddress(s.payer_address)}</td>
-                    <td className="mono">{shortAddress(s.pay_to)}</td>
-                    <td className="mono">{formatAmount(s.amount)}</td>
-                    <td>
-                      <span className={`status-pill ${s.status}`}>{s.status}</span>
-                    </td>
-                    <td className="mono">{s.tx_hash ? shortAddress(s.tx_hash) : "—"}</td>
-                    <td>{formatDate(s.created_at)}</td>
+          <>
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Payer</th>
+                    <th>Pay to</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Tx hash</th>
+                    <th>Created</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {visible.map((s) => (
+                    <tr key={s.id}>
+                      <td className="mono">{shortAddress(s.payer_address)}</td>
+                      <td className="mono">{shortAddress(s.pay_to)}</td>
+                      <td className="mono">{formatAmount(s.amount)}</td>
+                      <td>
+                        <span className={`status-pill ${s.status}`}>{s.status}</span>
+                      </td>
+                      <td className="mono">{s.tx_hash ? shortAddress(s.tx_hash) : "—"}</td>
+                      <td>{formatDate(s.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="admin-pagination">
+              <span className="sub">
+                Showing {visible.length} of {settlements.length}
+                {hasMore ? "+" : ""} loaded
+                {filter ? ` (${filter} filter applied to loaded rows)` : ""}
+              </span>
+              {hasMore && (
+                <button type="button" className="btn-secondary" disabled={loadingMore} onClick={() => load(offset)}>
+                  {loadingMore ? "Loading…" : "Load more"}
+                </button>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>

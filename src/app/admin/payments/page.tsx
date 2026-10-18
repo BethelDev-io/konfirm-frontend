@@ -44,19 +44,44 @@ function shortAddress(address: string): string {
   return `${address.slice(0, 4)}…${address.slice(-4)}`;
 }
 
+const PAGE_SIZE = 50;
+
 export default function AdminPaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [filter, setFilter] = useState<"" | PaymentStatus>("");
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [total, setTotal] = useState<number | null>(null);
+
+  async function fetchPage(status: string, offset: number): Promise<Payment[]> {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    params.set("limit", String(PAGE_SIZE));
+    params.set("offset", String(offset));
+    const res = await fetch(`${API_BASE}/admin/payments?${params.toString()}`, { credentials: "include" });
+    if (!res.ok) return [];
+    const body = await res.json();
+    if (Array.isArray(body)) {
+      setTotal(null);
+      return body;
+    }
+    setTotal(typeof body.total === "number" ? body.total : null);
+    return Array.isArray(body.items) ? body.items : [];
+  }
 
   async function load(status: string) {
     setLoading(true);
-    const url = status ? `${API_BASE}/admin/payments?status=${status}` : `${API_BASE}/admin/payments`;
-    const res = await fetch(url, { credentials: "include" });
-    if (res.ok) setPayments(await res.json());
+    setPayments(await fetchPage(status, 0));
     setLoading(false);
+  }
+
+  async function loadMore() {
+    setLoadingMore(true);
+    const next = await fetchPage(filter, payments.length);
+    setPayments((prev) => [...prev, ...next]);
+    setLoadingMore(false);
   }
 
   useEffect(() => {
@@ -151,6 +176,7 @@ export default function AdminPaymentsPage() {
                     <td>{formatDate(p.created_at)}</td>
                     <td>
                       <select
+                        aria-label="Payment status"
                         value={p.status}
                         disabled={pendingId === p.id}
                         onChange={(e) => changeStatus(p, e.target.value as PaymentStatus)}
@@ -166,6 +192,22 @@ export default function AdminPaymentsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {!loading && payments.length > 0 && (
+          <div className="admin-pagination">
+            <span>
+              Showing {payments.length}
+              {total !== null ? ` of ${total}` : ""}
+            </span>
+            {(total === null ? payments.length >= PAGE_SIZE : payments.length < total) && (
+              <button type="button" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
+            )}
+            {total === null && payments.length >= PAGE_SIZE && (
+              <span style={{ color: "var(--text-lo)", fontSize: 12 }}>There may be more payments.</span>
+            )}
           </div>
         )}
         {error && <div className="status error">{error}</div>}
