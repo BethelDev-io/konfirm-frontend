@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE } from "@/lib/api";
-import { formatUtcTimestamp } from "@/lib/format";
+import { apiFetch } from "@/lib/api";
 
 interface LiveRate {
   rate: string | null;
@@ -29,31 +28,17 @@ export default function AdminExchangeRatePage() {
   const [live, setLive] = useState<LiveRate | null>(null);
   const [conversions, setConversions] = useState<Conversion[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-
-  async function loadConversions(offset: number) {
-    const res = await fetch(
-      `${API_BASE}/admin/exchange-rate/conversions?limit=${CONVERSIONS_PAGE_SIZE}&offset=${offset}`,
-      { credentials: "include", cache: "no-store" }
-    );
-    if (!res.ok) return [];
-    const rows: Conversion[] = await res.json();
-    return rows;
-  }
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const [liveRes, rows] = await Promise.all([
-        fetch(`${API_BASE}/admin/exchange-rate/live`, { credentials: "include", cache: "no-store" }),
-        loadConversions(0),
+      const [liveData, convData] = await Promise.all([
+        apiFetch<LiveRate>("/admin/exchange-rate/live"),
+        apiFetch<Conversion[]>("/admin/exchange-rate/conversions"),
       ]);
-      if (liveRes.ok) setLive(await liveRes.json());
-      setConversions(rows);
-      // The backend hard-caps each page at CONVERSIONS_PAGE_SIZE rows. A
-      // full page means there may be more rows beyond it; a short page
-      // means we've reached the end.
-      setHasMore(rows.length === CONVERSIONS_PAGE_SIZE);
+      if (liveData) setLive(liveData);
+      if (convData) setConversions(convData);
+      if (!liveData || !convData) setError(true);
       setLoading(false);
     })();
   }, []);
@@ -96,11 +81,9 @@ export default function AdminExchangeRatePage() {
 
           <div className="admin-section">
             <h2 style={{ fontSize: 15, marginBottom: 12 }}>Applied conversions</h2>
-            <p className="hint" style={{ marginTop: -8, marginBottom: 12 }}>
-              Showing {conversions.length} conversion{conversions.length === 1 ? "" : "s"}
-              {hasMore ? " — more are available" : ""}.
-            </p>
-            {conversions.length === 0 ? (
+            {error ? (
+              <div className="empty">Could not load exchange rate — try again.</div>
+            ) : conversions.length === 0 ? (
               <div className="empty">No non-USDC payments have been converted yet.</div>
             ) : (
               <div className="admin-table-wrap">

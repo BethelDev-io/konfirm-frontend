@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE } from "@/lib/api";
-import { reportError } from "@/lib/report-error";
-import { formatUtcTimestamp } from "@/lib/format-date";
+import { apiFetch } from "@/lib/api";
 
 type RiskTier = "unverified" | "standard" | "established" | "enterprise";
 
@@ -31,13 +29,25 @@ function shortAddress(address: string | null): string {
 export default function AdminMerchantsPage() {
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   async function load() {
-    const res = await fetch(`${API_BASE}/admin/merchants`, { credentials: "include" });
-    if (res.ok) setMerchants(await res.json());
-    setLoading(false);
+    setLoadError(false);
+    try {
+      const data = await apiFetch<Merchant[]>("/admin/merchants");
+      if (data === null) {
+        setLoadError(true);
+      } else {
+        setMerchants(data);
+      }
+    } catch (err) {
+      console.error("[konfirm admin] merchants load failed", err);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -150,6 +160,8 @@ export default function AdminMerchantsPage() {
       <div className="admin-section">
         {loading ? (
           <div className="empty">Loading…</div>
+        ) : loadError ? (
+          <div className="empty">Could not load merchants — try again.</div>
         ) : merchants.length === 0 ? (
           <div className="empty">No merchants yet.</div>
         ) : (

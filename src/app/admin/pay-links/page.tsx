@@ -28,11 +28,16 @@ function formatAmount(link: PayLink): string {
 export default function AdminPayLinksPage() {
   const [links, setLinks] = useState<PayLink[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     (async () => {
       const result = await apiFetch<PayLink[]>("/admin/links");
-      if (result.ok) setLinks(result.data);
+      if (result.ok && result.data) {
+        setLinks(result.data);
+      } else {
+        setError(true);
+      }
       setLoading(false);
     })();
   }, []);
@@ -73,6 +78,8 @@ export default function AdminPayLinksPage() {
       <div className="admin-section">
         {loading ? (
           <div className="empty">Loading…</div>
+        ) : error ? (
+          <div className="empty">Could not load pay links — try again.</div>
         ) : links.length === 0 ? (
           <div className="empty">No pay links have been created yet.</div>
         ) : (

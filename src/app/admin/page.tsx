@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 interface Stats {
   merchants: { total: number; active: number; suspended: number; pending: number };
@@ -69,15 +69,17 @@ export default function AdminOverviewPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activityError, setActivityError] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const [statsRes, activityRes] = await Promise.all([
-        fetch(`${API_BASE}/admin/stats`, { credentials: "include" }),
-        fetch(`${API_BASE}/admin/activity`, { credentials: "include" }),
+      const [statsResult, activityResult] = await Promise.all([
+        apiFetch<Stats>("/admin/stats"),
+        apiFetch<ActivityEntry[]>("/admin/activity"),
       ]);
-      if (statsRes.ok) setStats(await statsRes.json());
-      if (activityRes.ok) setActivity(await activityRes.json());
+      if (statsResult.data) setStats(statsResult.data);
+      if (activityResult.data) setActivity(activityResult.data);
+      else setActivityError(true);
       setLoading(false);
     })();
   }, []);
@@ -140,7 +142,9 @@ export default function AdminOverviewPage() {
 
       <div className="admin-section">
         <h2>Recent activity</h2>
-        {activity.length === 0 ? (
+        {activityError ? (
+          <div className="empty">Could not load activity — try again.</div>
+        ) : activity.length === 0 ? (
           <div className="empty">No admin actions yet.</div>
         ) : (
           <ul className="activity-feed">

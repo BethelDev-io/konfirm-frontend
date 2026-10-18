@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 interface Summary {
   payment_count: number;
@@ -26,15 +26,17 @@ export default function AdminFeeRevenuePage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [daily, setDaily] = useState<DailyRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const [summaryRes, dailyRes] = await Promise.all([
-        fetch(`${API_BASE}/admin/fee-revenue/summary`, { credentials: "include" }),
-        fetch(`${API_BASE}/admin/fee-revenue/daily`, { credentials: "include" }),
+      const [summaryData, dailyData] = await Promise.all([
+        apiFetch<Summary>("/admin/fee-revenue/summary"),
+        apiFetch<DailyRow[]>("/admin/fee-revenue/daily"),
       ]);
-      if (summaryRes.ok) setSummary(await summaryRes.json());
-      if (dailyRes.ok) setDaily(await dailyRes.json());
+      if (summaryData) setSummary(summaryData);
+      if (dailyData) setDaily(dailyData);
+      setError(!summaryData || !dailyData);
       setLoading(false);
     })();
   }, []);
@@ -65,7 +67,9 @@ export default function AdminFeeRevenuePage() {
           </div>
 
           <div className="admin-section">
-            {daily.length === 0 ? (
+            {error ? (
+              <div className="empty">Could not load fee revenue — try again.</div>
+            ) : daily.length === 0 ? (
               <div className="empty">No settled payments in the last 30 days.</div>
             ) : (
               <div className="admin-table-wrap">

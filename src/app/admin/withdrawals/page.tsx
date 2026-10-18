@@ -22,11 +22,17 @@ export default function AdminWithdrawalsPage() {
   const [attempts, setAttempts] = useState<WithdrawalAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
 
   async function load(showSpinner: boolean) {
     if (showSpinner) setLoading(true);
     const result = await apiFetch<WithdrawalAttempt[]>("/admin/withdrawal-attempts");
-    if (result.ok) setAttempts(result.data);
+    if (result.ok && result.data) {
+      setAttempts(result.data);
+      setError(false);
+    } else {
+      setError(true);
+    }
     setLoading(false);
   }
 
@@ -83,6 +89,8 @@ export default function AdminWithdrawalsPage() {
 
         {loading ? (
           <div className="empty">Loading…</div>
+        ) : error ? (
+          <div className="empty">Could not load withdrawals — try again.</div>
         ) : attempts.length === 0 ? (
           <div className="empty">No cash-outs have been started yet.</div>
         ) : (

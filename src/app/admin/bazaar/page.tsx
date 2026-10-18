@@ -31,22 +31,19 @@ export default function AdminBazaarPage() {
   const [filter, setFilter] = useState<"" | ListingStatus>("pending");
   const [loading, setLoading] = useState(true);
   const [pendingId, setPendingId] = useState<string | null>(null);
-  // Monotonically increasing id for each load() call. Used to discard a
-  // response that resolves after a newer request has already been issued,
-  // so a slow in-flight request can never clobber the result of a faster,
-  // more recent one.
-  const requestIdRef = useRef(0);
+  const [error, setError] = useState<string | null>(null);
 
   async function load(status: string) {
     const requestId = ++requestIdRef.current;
     setLoading(true);
+    setError(null);
     const result = await apiFetch<Listing[]>(status ? `/admin/bazaar-listings?status=${status}` : "/admin/bazaar-listings");
-    if (requestId !== requestIdRef.current) {
-      // A newer load() has been issued since this one started; drop this
-      // stale response instead of overwriting fresher data.
-      return;
+    if (result.ok && result.data) {
+      setListings(result.data);
+    } else {
+      setListings([]);
+      setError(result.ok ? "Could not load listings — try again." : result.message || "Could not load listings — try again.");
     }
-    if (result.ok) setListings(result.data);
     setLoading(false);
   }
 
@@ -57,9 +54,20 @@ export default function AdminBazaarPage() {
   }, [filter]);
 
   async function handleReview(listing: Listing, status: "approved" | "rejected") {
+    if (status === "approved") {
+      const confirmed = window.confirm(
+        `Approve "${listing.name || listing.url}"? This publishes the listing to the public discovery manifest (/.well-known/x402-bazaar.json), making it visible to other agents.`
+      );
+      if (!confirmed) return;
+    }
     setPendingId(listing.id);
+    setError(null);
     try {
-      await apiPatch(`/admin/bazaar-listings/${listing.id}/status`, { status });
+      const result = await apiPatch(`/admin/bazaar-listings/${listing.id}/status`, { status });
+      if (!result.ok) {
+        setError(result.message || `Could not ${status === "approved" ? "approve" : "reject"} listing — try again.`);
+        return;
+      }
       await load(filter);
     } finally {
       setPendingId(null);
@@ -86,9 +94,13 @@ export default function AdminBazaarPage() {
         ))}
       </div>
 
+      {error && <div className="empty">{error}</div>}
+
       <div className="admin-section">
         {loading ? (
           <div className="empty">Loading…</div>
+        ) : error ? (
+          <div className="empty">Could not load listings — try again.</div>
         ) : listings.length === 0 ? (
           <div className="empty">No listings match this filter.</div>
         ) : (
