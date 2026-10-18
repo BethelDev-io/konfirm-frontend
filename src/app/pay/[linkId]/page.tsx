@@ -1,7 +1,6 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
-import freighterApi from "@stellar/freighter-api";
 import qrcode from "qrcode-generator";
 import { API_BASE } from "@/lib/api";
 
@@ -154,6 +153,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
     setConnecting(true);
     try {
       setStatusMsg(STAGE.CONNECT);
+      const { default: freighterApi } = await import("@stellar/freighter-api");
       const access = await freighterApi.requestAccess();
       if (access.error) throw new Error(access.error);
       const payerAddress = access.address;

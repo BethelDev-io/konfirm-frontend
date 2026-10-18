@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import freighterApi from "@stellar/freighter-api";
 import { API_BASE } from "@/lib/api";
 import { useRequireAuth } from "@/lib/useAuth";
 
@@ -90,6 +89,7 @@ export default function CashoutPage() {
     if (!prepRes.ok) throw new Error(prep.message || "could not prepare the transfer");
 
     showProgress("Approve the transfer in your wallet…");
+    const { default: freighterApi } = await import("@stellar/freighter-api");
     const signed = await freighterApi.signTransaction(prep.xdr, {
       networkPassphrase: prep.network_passphrase,
       address: merchantAddress.current!,
@@ -150,6 +150,7 @@ export default function CashoutPage() {
     cancelled.current = false;
     try {
       setStatus("Connecting your wallet…");
+      const { default: freighterApi } = await import("@stellar/freighter-api");
       const access = await freighterApi.requestAccess();
       if (access.error) throw new Error(access.error);
 

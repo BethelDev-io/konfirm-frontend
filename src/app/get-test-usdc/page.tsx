@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import freighterApi from "@stellar/freighter-api";
 import { API_BASE } from "@/lib/api";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
@@ -42,6 +41,7 @@ export default function GetTestUsdcPage() {
     setStatus1("");
     try {
       showProgress("Connecting your wallet…");
+      const { default: freighterApi } = await import("@stellar/freighter-api");
       const access = await freighterApi.requestAccess();
       if (access.error) throw new Error(access.error);
       freighterAddress.current = access.address;
@@ -126,6 +126,7 @@ export default function GetTestUsdcPage() {
       if (!prepRes.ok) throw new Error(prep.message || "could not prepare the transfer");
 
       showProgress("Approve the transfer in your wallet…");
+      const { default: freighterApi } = await import("@stellar/freighter-api");
       const signed = await freighterApi.signTransaction(prep.xdr, {
         networkPassphrase: prep.network_passphrase,
         address: freighterAddress.current!,

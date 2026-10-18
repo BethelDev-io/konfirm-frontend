@@ -1,6 +1,5 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { API_BASE } from "@/lib/api";
 
 interface Summary {
@@ -22,22 +21,33 @@ function formatDay(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-export default function AdminFeeRevenuePage() {
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [daily, setDaily] = useState<DailyRow[]>([]);
-  const [loading, setLoading] = useState(true);
+async function fetchFromBackend<T>(path: string, cookieHeader: string): Promise<T | null> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { cookie: cookieHeader },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
 
-  useEffect(() => {
-    (async () => {
-      const [summaryRes, dailyRes] = await Promise.all([
-        fetch(`${API_BASE}/admin/fee-revenue/summary`, { credentials: "include" }),
-        fetch(`${API_BASE}/admin/fee-revenue/daily`, { credentials: "include" }),
-      ]);
-      if (summaryRes.ok) setSummary(await summaryRes.json());
-      if (dailyRes.ok) setDaily(await dailyRes.json());
-      setLoading(false);
-    })();
-  }, []);
+export default async function AdminFeeRevenuePage() {
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  if (!cookieHeader) {
+    redirect("/admin/login");
+  }
+
+  const [summary, daily] = await Promise.all([
+    fetchFromBackend<Summary>("/admin/fee-revenue/summary", cookieHeader),
+    fetchFromBackend<DailyRow[]>("/admin/fee-revenue/daily", cookieHeader),
+  ]);
+
+  const dailyRows = daily ?? [];
 
   return (
     <div>
@@ -47,51 +57,45 @@ export default function AdminFeeRevenuePage() {
         payment&apos;s fee was never really earned, so it&apos;s excluded here.
       </p>
 
-      {loading ? (
-        <div className="empty">Loading…</div>
-      ) : (
-        <>
-          <div className="admin-section">
-            <div className="stat-grid">
-              <div className="stat-card">
-                <div className="stat-label">Total fee revenue</div>
-                <div className="stat-value">{summary ? formatUsdc(summary.total_fee_usdc) : "—"}</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Paid transactions</div>
-                <div className="stat-value">{summary?.payment_count ?? "—"}</div>
-              </div>
-            </div>
+      <div className="admin-section">
+        <div className="stat-grid">
+          <div className="stat-card">
+            <div className="stat-label">Total fee revenue</div>
+            <div className="stat-value">{summary ? formatUsdc(summary.total_fee_usdc) : "—"}</div>
           </div>
+          <div className="stat-card">
+            <div className="stat-label">Paid transactions</div>
+            <div className="stat-value">{summary?.payment_count ?? "—"}</div>
+          </div>
+        </div>
+      </div>
 
-          <div className="admin-section">
-            {daily.length === 0 ? (
-              <div className="empty">No settled payments in the last 30 days.</div>
-            ) : (
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Day</th>
-                      <th>Payments</th>
-                      <th>Fee revenue</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {daily.map((row) => (
-                      <tr key={row.day}>
-                        <td>{formatDay(row.day)}</td>
-                        <td className="mono">{row.payment_count}</td>
-                        <td className="mono">{formatUsdc(row.fee_usdc)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+      <div className="admin-section">
+        {dailyRows.length === 0 ? (
+          <div className="empty">No settled payments in the last 30 days.</div>
+        ) : (
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>Payments</th>
+                  <th>Fee revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dailyRows.map((row) => (
+                  <tr key={row.day}>
+                    <td>{formatDay(row.day)}</td>
+                    <td className="mono">{row.payment_count}</td>
+                    <td className="mono">{formatUsdc(row.fee_usdc)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 }

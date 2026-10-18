@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import freighterApi from "@stellar/freighter-api";
 import { API_BASE } from "@/lib/api";
 
 // Merchant-side fee settlement (docs/design/qr-fee-collection.md, Option B).
@@ -64,6 +63,7 @@ export default function FeeSettlement({ address }: { address: string }) {
       if (!created.ok) throw Object.assign(new Error(describeFailure(body)), { handled: true });
 
       setStatus({ text: "Approve the fee payment in your wallet…", error: false });
+      const { default: freighterApi } = await import("@stellar/freighter-api");
       const signed = await freighterApi.signTransaction(body.unsigned_xdr, {
         networkPassphrase: body.network_passphrase,
         address,
