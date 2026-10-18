@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { explorerUrl } from "@/lib/stellar-explorer";
 
 interface BlockchainStatus {
   network: string;
@@ -12,10 +13,6 @@ interface BlockchainStatus {
   };
   rpc: { reachable: boolean; latencyMs: number | null; latestLedger: number | null };
   contracts: { name: string; id: string }[];
-}
-
-function explorerUrl(id: string): string {
-  return `https://stellar.expert/explorer/testnet/contract/${id}`;
 }
 
 export default function AdminBlockchainPage() {
@@ -117,7 +114,7 @@ export default function AdminBlockchainPage() {
                 <tr key={c.id}>
                   <td style={{ color: "var(--text-hi)" }}>{c.name}</td>
                   <td className="mono">
-                    <a href={explorerUrl(c.id)} target="_blank" rel="noreferrer">
+                    <a href={explorerUrl(c.id, status.network)} target="_blank" rel="noreferrer">
                       {c.id}
                     </a>
                   </td>

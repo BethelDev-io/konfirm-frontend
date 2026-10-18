@@ -94,6 +94,7 @@ export default function GetTestUsdcPage() {
         if (cancelled.current) return;
         const statusRes = await fetch(
           `${API_BASE}/deposits/status?token=${encodeURIComponent(tokenBody.token)}&id=${encodeURIComponent(startBody.id)}`,
+          { cache: "no-store" },
         );
         const txn = await statusRes.json();
         if (cancelled.current) return;

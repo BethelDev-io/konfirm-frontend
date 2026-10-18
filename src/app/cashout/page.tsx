@@ -111,7 +111,13 @@ export default function CashoutPage() {
 
   async function pollStatus(token: string, id: string) {
     while (!cancelled.current) {
-      const res = await fetch(`${API_BASE}/withdrawals/status?token=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`);
+      // Always-fresh read: this loop polls withdrawal status, so a
+      // cached/stale response could keep showing "pending" after the
+      // withdrawal has actually completed or failed.
+      const res = await fetch(
+        `${API_BASE}/withdrawals/status?token=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`,
+        { cache: "no-store" },
+      );
       const txn = await res.json().catch(() => ({}));
       if (!res.ok) {
         showFormError(friendlyMessage(new Error(txn.message)));
