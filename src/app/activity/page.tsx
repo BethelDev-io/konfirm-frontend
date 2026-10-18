@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { API_BASE, apiPost } from "@/lib/api";
 import { useRequireAuth } from "@/lib/useAuth";
 import FeeSettlement from "@/components/fee-settlement";
+
+type PaymentStatus = "paid" | "held" | "refunded" | "disputed";
 
 interface Payment {
   id: string;
@@ -13,12 +15,30 @@ interface Payment {
   asset_code: string;
   payer_address: string;
   link_description: string | null;
-  status: "paid" | "held" | "refunded" | "disputed";
+  status: PaymentStatus;
   flag_reason: string | null;
   fee_status: "none" | "collected" | "owed" | "claimed" | "settled";
   fee_owed_raw: string | null;
   fee_asset_code: string | null;
+  created_at: string;
 }
+
+const STATUS_FILTERS: Array<{ value: "all" | PaymentStatus; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "paid", label: "Paid" },
+  { value: "held", label: "Held" },
+  { value: "refunded", label: "Refunded" },
+  { value: "disputed", label: "Disputed" },
+];
+
+type DateRangePreset = "all" | "7" | "30" | "90";
+
+const DATE_RANGE_FILTERS: Array<{ value: DateRangePreset; label: string }> = [
+  { value: "all", label: "All time" },
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
+  { value: "90", label: "Last 90 days" },
+];
 
 // Plain-language reasons for an admin-review hold, shown to the merchant.
 // Anything unrecognised falls back to a neutral line rather than leaking an
@@ -57,6 +77,10 @@ function ActivityContent() {
   const showNav = Boolean(merchant);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [pending, setPending] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | PaymentStatus>("all");
+  const [dateFilter, setDateFilter] = useState<DateRangePreset>("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [now, setNow] = useState<number | null>(null);
 
   const poll = useCallback(async () => {
     if (!hasAddress) return;
@@ -69,6 +93,7 @@ function ActivityContent() {
     const pendingBody = await pendingRes.json();
     setPayments(paymentsBody);
     setPending(Boolean(pendingBody.pending));
+    setNow(Date.now());
   }, [hasAddress]);
 
   // The recursive scheduling lives here, in a plain local function, rather
@@ -105,6 +130,16 @@ function ActivityContent() {
       totals[p.asset_code] = (totals[p.asset_code] || 0) + Number(p.net_usdc);
     });
   const hasBalances = Object.keys(totals).length > 0;
+
+  const filteredPayments = useMemo(() => {
+    const reference = now ?? 0;
+    const dateCutoff = dateFilter === "all" ? null : reference - Number(dateFilter) * 24 * 60 * 60 * 1000;
+    return payments.filter((p) => {
+      if (statusFilter !== "all" && p.status !== statusFilter) return false;
+      if (dateCutoff !== null && new Date(p.created_at).getTime() < dateCutoff) return false;
+      return true;
+    });
+  }, [payments, statusFilter, dateFilter, now]);
 
   return (
     <div className="wrap">
@@ -144,37 +179,117 @@ function ActivityContent() {
           </>
         )}
       </div>
+      {hasAddress && payments.length > 0 && (
+        <div className="header-row" style={{ gap: 12, flexWrap: "wrap" }}>
+          <div className="field">
+            <label htmlFor="status-filter">Status</label>
+            <select
+              id="status-filter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | PaymentStatus)}
+            >
+              {STATUS_FILTERS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="date-filter">Date range</label>
+            <select id="date-filter" value={dateFilter} onChange={(e) => setDateFilter(e.target.value as DateRangePreset)}>
+              {DATE_RANGE_FILTERS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
       <div>
         {resolved && !hasAddress && <div className="empty">No Stellar address on file yet.</div>}
         {hasAddress && payments.length === 0 && !pending && (
           <div className="empty">No payments yet — this updates the instant one lands.</div>
         )}
-        {payments.map((p) => (
-          <div className="payment" key={p.id}>
-            <div className="left">
-              <div className="tick">✓</div>
-              <div className="desc">
-                {p.link_description || "Payment"}
-                <div className="from">
-                  from {p.payer_address.slice(0, 4)}…{p.payer_address.slice(-4)}
+        {hasAddress && payments.length > 0 && filteredPayments.length === 0 && (
+          <div className="empty">No payments match this filter.</div>
+        )}
+        {filteredPayments.map((p) => {
+          const isExpanded = expandedId === p.id;
+          return (
+            <div
+              className="payment"
+              key={p.id}
+              role="button"
+              tabIndex={0}
+              aria-expanded={isExpanded}
+              onClick={() => setExpandedId(isExpanded ? null : p.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setExpandedId(isExpanded ? null : p.id);
+                }
+              }}
+              style={{ cursor: "pointer", flexDirection: "column", alignItems: "stretch" }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                <div className="left">
+                  <div className="tick">✓</div>
+                  <div className="desc">
+                    {p.link_description || "Payment"}
+                    <div className="from">
+                      from {p.payer_address.slice(0, 4)}…{p.payer_address.slice(-4)}
+                    </div>
+                    {p.fee_status === "owed" && p.fee_owed_raw && (
+                      <div className="from">
+                        Fee owed {p.fee_owed_raw} {p.fee_asset_code}
+                      </div>
+                    )}
+                    {p.status === "held" && (
+                      <div className="from" role="status">
+                        {HOLD_REASON_TEXT[p.flag_reason ?? ""] ?? HOLD_FALLBACK}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                {p.fee_status === "owed" && p.fee_owed_raw && (
-                  <div className="from">
-                    Fee owed {p.fee_owed_raw} {p.fee_asset_code}
-                  </div>
-                )}
-                {p.status === "held" && (
-                  <div className="from" role="status">
-                    {HOLD_REASON_TEXT[p.flag_reason ?? ""] ?? HOLD_FALLBACK}
-                  </div>
-                )}
+                <div className="amount">
+                  {p.status === "held" ? "On hold" : formatAmount(Number(p.net_usdc), p.asset_code)}
+                </div>
               </div>
+              {isExpanded && (
+                <div className="from" style={{ marginTop: 12, width: "100%", lineHeight: 1.8 }}>
+                  <div>
+                    <strong>Payment ID:</strong> <span className="mono">{p.id}</span>
+                  </div>
+                  <div>
+                    <strong>Status:</strong> {p.status}
+                  </div>
+                  <div>
+                    <strong>Date:</strong> {new Date(p.created_at).toLocaleString()}
+                  </div>
+                  <div>
+                    <strong>Payer address:</strong> <span className="mono">{p.payer_address}</span>
+                  </div>
+                  <div>
+                    <strong>Amount:</strong> {formatAmount(Number(p.net_usdc), p.asset_code)}
+                  </div>
+                  {p.fee_status !== "none" && (
+                    <div>
+                      <strong>Fee status:</strong> {p.fee_status}
+                      {p.fee_owed_raw && ` (${p.fee_owed_raw} ${p.fee_asset_code})`}
+                    </div>
+                  )}
+                  {p.status === "held" && (
+                    <div>
+                      <strong>Hold reason:</strong> {HOLD_REASON_TEXT[p.flag_reason ?? ""] ?? HOLD_FALLBACK}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="amount">
-              {p.status === "held" ? "On hold" : formatAmount(Number(p.net_usdc), p.asset_code)}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
