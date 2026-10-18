@@ -236,7 +236,7 @@ export default function GetTestUsdcPage() {
         {view === "success" && (
           <div className="success-box">
             <div className="tick">✓</div>
-            <div className="success-title">Sent</div>
+            <h1 className="success-title">Sent</h1>
             <div className="success-detail">Check the destination wallet — the balance should update shortly.</div>
             <button type="button" className="secondary" onClick={handleAnother}>
               Send more

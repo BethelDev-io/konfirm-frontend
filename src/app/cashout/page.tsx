@@ -239,6 +239,7 @@ export default function CashoutPage() {
                   key={c}
                   type="button"
                   className={`ctoggle${currency === c ? " active" : ""}`}
+                  aria-pressed={currency === c}
                   onClick={() => setCurrency(c)}
                 >
                   {c}
@@ -265,7 +266,7 @@ export default function CashoutPage() {
         {view === "success" && (
           <div className="success-box">
             <div className="tick">✓</div>
-            <div className="success-title">Cash-out complete</div>
+            <h1 className="success-title">Cash-out complete</h1>
             <div className="success-detail">Your funds are on their way to your bank.</div>
             <button type="button" className="secondary" onClick={handleAnother}>
               Start another cash-out

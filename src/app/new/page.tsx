@@ -133,6 +133,7 @@ export default function NewPaymentPage() {
                   key={c}
                   type="button"
                   className={`ctoggle${currency === c ? " active" : ""}`}
+                  aria-pressed={currency === c}
                   onClick={() => setCurrency(c)}
                 >
                   {c}
@@ -167,7 +168,7 @@ export default function NewPaymentPage() {
         ) : (
           <div className="success-box">
             <div className="tick">✓</div>
-            <div className="success-title">Ready to send</div>
+            <h1 className="success-title">Ready to send</h1>
             <div className="success-detail">Share this link, or open it yourself to test it now.</div>
             <div className="link-box">
               <span>{linkUrl}</span>
