@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
+import type { Metadata } from "next";
 import freighterApi from "@stellar/freighter-api";
 import qrcode from "qrcode-generator";
 import { API_BASE } from "@/lib/api";
@@ -61,6 +62,11 @@ function randomMuxedId(): string {
   const low = BigInt(buf[1]);
   return ((high << 32n) | low).toString();
 }
+
+export const metadata: Metadata = {
+  title: "Checkout",
+  robots: { index: false, follow: false },
+};
 
 export default function CheckoutPage({ params }: { params: Promise<{ linkId: string }> }) {
   const { linkId } = use(params);
@@ -225,6 +231,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
 
   useEffect(() => {
     cancelledRef.current = false;
+
+    // Scope confirmation state to this linkId: if this component instance is
+    // ever reused for a different link without a full remount, the new link
+    // must be able to confirm rather than silently no-op.
+    alreadyConfirmed.current = false;
+    sharedMuxedId.current = null;
 
     async function init() {
       const res = await fetch(`${API_BASE}/links/${linkId}/public`);

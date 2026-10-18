@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Konfirm",
+  title: {
+    template: "%s · Konfirm",
+    default: "Konfirm",
+  },
   description: "A non-custodial payment processor on Stellar.",
 };
 
