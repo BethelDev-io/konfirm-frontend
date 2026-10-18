@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
+import { formatUtcTimestamp } from "@/lib/format";
 
 interface ReferralRow {
   id: string;
@@ -12,10 +13,6 @@ interface ReferralRow {
   referred_name: string;
   referred_email: string;
   activated: boolean;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
 }
 
 export default function AdminReferralsPage() {
@@ -72,7 +69,7 @@ export default function AdminReferralsPage() {
                         {r.activated ? "Active" : "Signed up"}
                       </span>
                     </td>
-                    <td>{formatDate(r.created_at)}</td>
+                    <td>{formatUtcTimestamp(r.created_at)}</td>
                   </tr>
                 ))}
               </tbody>

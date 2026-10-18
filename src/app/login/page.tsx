@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { API_BASE } from "@/lib/api";
+import { reportError } from "@/lib/report-error";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export default function LoginPage() {
       }
       router.push("/activity");
     } catch (err) {
-      console.error("[konfirm login]", err);
+      reportError("login", err);
       setStatus(err instanceof Error ? err.message : "Could not log in. Please try again.");
       setSubmitting(false);
     }

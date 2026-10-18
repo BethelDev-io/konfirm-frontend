@@ -115,6 +115,7 @@ function ActivityContent() {
         {showNav && (
           <div className="nav">
             <Link href="/new">+ New payment</Link>
+            <Link href="/links">My links</Link>
             <Link href="/cashout">Cash out</Link>
             <button type="button" onClick={handleLogout}>
               Log out

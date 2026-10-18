@@ -4,6 +4,8 @@ import { use, useEffect, useRef, useState } from "react";
 import freighterApi from "@stellar/freighter-api";
 import qrcode from "qrcode-generator";
 import { API_BASE } from "@/lib/api";
+import { reportError } from "@/lib/report-error";
+import { useBeforeUnload } from "@/lib/use-before-unload";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 
@@ -75,6 +77,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
 
   const alreadyConfirmed = useRef(false);
   const sharedMuxedId = useRef<string | null>(null);
+  // True only while a payment is being signed/submitted/confirmed, so the
+  // beforeunload prompt never fires during passive polling or idle states.
+  const operationInFlight = useRef(false);
+  useBeforeUnload(operationInFlight);
 
   function setStatusMsg(msg: string, isError = false) {
     setStatus(msg);
@@ -145,13 +151,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
       setQrSvg(qr.createSvgTag(5, 8));
       setQrUri(body.uri);
     } catch (err) {
-      console.error("[konfirm checkout] QR setup failed", err);
+      reportError(err, { tags: { flow: "checkout", stage: "qr-setup", linkId } });
       setShowQr(false);
     }
   }
 
   async function handleConnect() {
     setConnecting(true);
+    operationInFlight.current = true;
     try {
       setStatusMsg(STAGE.CONNECT);
       const access = await freighterApi.requestAccess();
@@ -205,9 +212,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
         setStatusMsg("Your payment was sent but hasn't been confirmed on Stellar yet. This can take a few minutes on a busy network. You don't need to pay again: the merchant will see it as soon as it confirms, and you can close this page.", true);
       }
     } catch (err) {
-      console.error("[konfirm checkout]", err);
+      reportError(err, { tags: { flow: "checkout", stage: "connect-and-pay", linkId } });
       setStatusMsg(friendlyMessage(err), true);
     } finally {
+      operationInFlight.current = false;
       setConnecting(false);
     }
   }
@@ -227,7 +235,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
       try {
         sharedMuxedId.current = await reserveSessionWithRetry();
       } catch (err) {
-        console.error("[konfirm checkout] could not reserve a payment session", err);
+        reportError(err, { tags: { flow: "checkout", stage: "reserve-session", linkId } });
         setStatusMsg(friendlyMessage(err), true);
         setShowQr(false);
         return;
