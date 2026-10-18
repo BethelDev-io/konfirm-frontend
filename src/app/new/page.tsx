@@ -16,7 +16,7 @@ interface Merchant {
 
 export default function NewPaymentPage() {
   const router = useRouter();
-  const { data: merchant } = useRequireAuth<Merchant>({
+  const { data: merchant, resolved } = useRequireAuth<Merchant>({
     meEndpoint: "/auth/me",
     loginPath: "/login",
     select: (body) => (body as { merchant: Merchant }).merchant,
@@ -77,6 +77,8 @@ export default function NewPaymentPage() {
     setDescription("");
     setShowResult(false);
   }
+
+  if (!resolved) return null;
 
   return (
     <div className="page-center">

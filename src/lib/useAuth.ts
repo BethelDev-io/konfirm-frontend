@@ -43,15 +43,29 @@ export function useRequireAuth<T = unknown>(options: UseRequireAuthOptions<T>): 
     if (skip) return;
     let cancelled = false;
     (async () => {
-      const res = await fetch(`${API_BASE}${meEndpoint}`, { credentials: "include" });
-      if (cancelled) return;
-      if (!res.ok) {
+      try {
+        const res = await fetch(`${API_BASE}${meEndpoint}`, { credentials: "include" });
+        if (cancelled) return;
+        if (!res.ok) {
+          router.push(loginPath);
+          return;
+        }
+        // Guard against a 200 with an empty/non-JSON body: an unguarded
+        // res.json() would throw and leave `resolved` false forever.
+        const body = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (body === null) {
+          router.push(loginPath);
+          return;
+        }
+        setData(select ? select(body) : (body as T));
+        setResolved(true);
+      } catch {
+        // Any other unexpected failure (network error, select() throwing)
+        // must still reach a terminal state rather than hanging the gate.
+        if (cancelled) return;
         router.push(loginPath);
-        return;
       }
-      const body = await res.json();
-      setData(select ? select(body) : (body as T));
-      setResolved(true);
     })();
     return () => {
       cancelled = true;

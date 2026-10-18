@@ -106,6 +106,12 @@ function ActivityContent() {
     });
   const hasBalances = Object.keys(totals).length > 0;
 
+  // Hold off rendering the dashboard shell (nav, actions, fee settlement)
+  // until the client-side auth check resolves — the edge proxy only checks
+  // cookie presence, so an expired session would otherwise briefly expose a
+  // fully interactive page.
+  if (!resolved) return null;
+
   return (
     <div className="wrap">
       <div className="header-row">
@@ -145,7 +151,7 @@ function ActivityContent() {
         )}
       </div>
       <div>
-        {resolved && !hasAddress && <div className="empty">No Stellar address on file yet.</div>}
+        {!hasAddress && <div className="empty">No Stellar address on file yet.</div>}
         {hasAddress && payments.length === 0 && !pending && (
           <div className="empty">No payments yet — this updates the instant one lands.</div>
         )}
