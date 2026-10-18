@@ -271,6 +271,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
           <span className="mark">✓</span> Konfirm
         </div>
 
+        <h1 className="visually-hidden">
+          {linkData ? `Pay ${linkData.merchant_name}` : "Checkout"}
+        </h1>
+
         {!linkData && !confirmed && <div>{loadingText}</div>}
 
         {linkData && !confirmed && (
@@ -320,7 +324,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
         {confirmed && (
           <div className="success-box">
             <div className="tick">✓</div>
-            <div className="success-title">Konfirmed</div>
+            <h1 className="success-title">Konfirmed</h1>
             <div className="success-detail">Your payment landed and was konfirmed on-chain.</div>
             <a
               className="txlink"
