@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
+import { formatAmount } from "@/lib/format";
 
 type PaymentStatus = "paid" | "held" | "disputed";
 
@@ -34,10 +35,6 @@ const FLAG_LABEL: Record<string, string> = {
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString();
-}
-
-function formatAmount(amount: string, code: string): string {
-  return code === "USDC" ? `$${Number(amount).toFixed(2)}` : `${Number(amount).toFixed(2)} ${code}`;
 }
 
 function shortAddress(address: string): string {
@@ -138,7 +135,7 @@ export default function AdminPaymentsPage() {
                       <div style={{ color: "var(--text-hi)" }}>{p.merchant_name}</div>
                       <div className="mono">{p.merchant_email}</div>
                     </td>
-                    <td className="mono">{formatAmount(p.amount_usdc, p.asset_code)}</td>
+                    <td className="mono">{formatAmount(p.amount_usdc, p.asset_code, "en-US")}</td>
                     <td className="mono">{shortAddress(p.payer_address)}</td>
                     <td>
                       <span className={`status-pill ${p.status}`}>{p.status}</span>

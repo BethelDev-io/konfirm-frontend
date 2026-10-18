@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatAmount as formatCurrencyAmount } from "@/lib/format";
 
 type SettlementStatus = "settled" | "failed" | "held";
 
@@ -27,7 +28,7 @@ function formatDate(iso: string): string {
 // existing payments table's already-decimal amount_usdc.
 function formatAmount(amount: string): string {
   const n = Number(amount) / 10_000_000;
-  return Number.isFinite(n) ? `$${n.toFixed(2)}` : amount;
+  return Number.isFinite(n) ? formatCurrencyAmount(n, "USDC") : amount;
 }
 
 function shortAddress(address: string): string {

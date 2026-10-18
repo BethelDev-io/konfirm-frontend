@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiPost } from "@/lib/api";
@@ -54,6 +55,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const isLoginPage = pathname === "/admin/login";
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // The login page itself never needs this check — running it there too
   // would just redirect straight back to itself.
@@ -73,7 +75,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!resolved) return null;
 
   return (
-    <div className="admin-shell">
+    <div className={`admin-shell${sidebarOpen ? " sidebar-open" : ""}`}>
+      <button
+        type="button"
+        className="admin-sidebar-toggle"
+        aria-label={sidebarOpen ? "Close navigation" : "Open navigation"}
+        aria-expanded={sidebarOpen}
+        onClick={() => setSidebarOpen((open) => !open)}
+      >
+        <span aria-hidden="true">{sidebarOpen ? "✕" : "☰"}</span>
+      </button>
       <aside className="admin-sidebar">
         <div className="brand">
           <span className="mark">✓</span> Konfirm Admin
@@ -83,7 +94,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div key={group.label} className="admin-sidebar-group">
               <div className="admin-sidebar-group-label">{group.label}</div>
               {group.items.map((item) => (
-                <Link key={item.href} href={item.href} className={pathname === item.href ? "active" : ""}>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={pathname === item.href ? "active" : ""}
+                  onClick={() => setSidebarOpen(false)}
+                >
                   {item.label}
                 </Link>
               ))}
@@ -98,6 +114,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
       <main className="admin-main">{children}</main>
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="admin-sidebar-backdrop"
+          aria-label="Close navigation"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
     </div>
   );
 }

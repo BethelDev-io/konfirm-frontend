@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { API_BASE, apiPost } from "@/lib/api";
 import { useRequireAuth } from "@/lib/useAuth";
+import { formatAmount } from "@/lib/format";
 import FeeSettlement from "@/components/fee-settlement";
 
 interface Payment {
@@ -37,10 +38,6 @@ const HOLD_FALLBACK = "Held for review";
 interface Merchant {
   name: string;
   stellar_base_address: string | null;
-}
-
-function formatAmount(amount: number, code: string): string {
-  return code === "USDC" ? `$${amount.toFixed(2)}` : `${amount.toFixed(2)} ${code}`;
 }
 
 // The dashboard is only ever the logged-in merchant's own data. There's no
@@ -140,7 +137,7 @@ function ActivityContent() {
           ))
         ) : (
           <>
-            $0.00 <small>received</small>
+            {formatAmount(0, "USDC")} <small>received</small>
           </>
         )}
       </div>

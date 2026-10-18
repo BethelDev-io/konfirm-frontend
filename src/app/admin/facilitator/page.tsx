@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, apiPost } from "@/lib/api";
+import { formatAmount } from "@/lib/format";
 
 interface FacilitatorStatus {
   halted: boolean;
@@ -82,11 +83,11 @@ export default function AdminFacilitatorPage() {
           </div>
           <div className="stat-card">
             <div className="stat-label">Spent today</div>
-            <div className="stat-value">${status.spentTodayUsdc.toFixed(2)}</div>
+            <div className="stat-value">{formatAmount(status.spentTodayUsdc, "USDC")}</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Daily cap</div>
-            <div className="stat-value">${status.capUsdc.toFixed(2)}</div>
+            <div className="stat-value">{formatAmount(status.capUsdc, "USDC")}</div>
           </div>
         </div>
       </div>

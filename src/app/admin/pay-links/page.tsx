@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatAmount } from "@/lib/format";
 
 interface PayLink {
   id: string;
@@ -22,10 +23,7 @@ function formatDate(iso: string | null): string {
   return iso ? new Date(iso).toLocaleString() : "—";
 }
 
-function formatAmount(link: PayLink): string {
-  if (link.amount_usdc === null) return "Any amount";
-  return `${Number(link.amount_usdc).toFixed(2)} ${link.currency}`;
-}
+
 
 export default function AdminPayLinksPage() {
   const [links, setLinks] = useState<PayLink[]>([]);
@@ -67,7 +65,7 @@ export default function AdminPayLinksPage() {
           </div>
           <div className="stat-card">
             <div className="stat-label">Collected via links</div>
-            <div className="stat-value">${totalCollected.toFixed(2)}</div>
+            <div className="stat-value">{formatAmount(totalCollected, "USDC")}</div>
           </div>
         </div>
       </div>
@@ -94,7 +92,9 @@ export default function AdminPayLinksPage() {
                 {links.map((l) => (
                   <tr key={l.id}>
                     <td style={{ color: "var(--text-hi)" }}>{l.merchant_name}</td>
-                    <td className="mono">{formatAmount(l)}</td>
+                    <td className="mono">
+                      {l.amount_usdc === null ? "Any amount" : formatAmount(l.amount_usdc, l.currency)}
+                    </td>
                     <td>{l.description || "—"}</td>
                     <td className="mono">
                       {l.use_count}

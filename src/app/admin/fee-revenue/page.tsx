@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
+import { formatAmount } from "@/lib/format";
 
 interface Summary {
   payment_count: number;
@@ -12,10 +13,6 @@ interface DailyRow {
   day: string;
   payment_count: string;
   fee_usdc: string;
-}
-
-function formatUsdc(amount: string): string {
-  return `$${Number(amount).toFixed(2)}`;
 }
 
 function formatDay(iso: string): string {
@@ -55,7 +52,7 @@ export default function AdminFeeRevenuePage() {
             <div className="stat-grid">
               <div className="stat-card">
                 <div className="stat-label">Total fee revenue</div>
-                <div className="stat-value">{summary ? formatUsdc(summary.total_fee_usdc) : "—"}</div>
+                <div className="stat-value">{summary ? formatAmount(summary.total_fee_usdc, "USDC") : "—"}</div>
               </div>
               <div className="stat-card">
                 <div className="stat-label">Paid transactions</div>
@@ -82,7 +79,7 @@ export default function AdminFeeRevenuePage() {
                       <tr key={row.day}>
                         <td>{formatDay(row.day)}</td>
                         <td className="mono">{row.payment_count}</td>
-                        <td className="mono">{formatUsdc(row.fee_usdc)}</td>
+                        <td className="mono">{formatAmount(row.fee_usdc, "USDC")}</td>
                       </tr>
                     ))}
                   </tbody>
