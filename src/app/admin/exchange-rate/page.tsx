@@ -25,22 +25,51 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
+const CONVERSIONS_PAGE_SIZE = 50;
+
 export default function AdminExchangeRatePage() {
   const [live, setLive] = useState<LiveRate | null>(null);
   const [conversions, setConversions] = useState<Conversion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+
+  async function loadConversions(offset: number) {
+    const res = await fetch(
+      `${API_BASE}/admin/exchange-rate/conversions?limit=${CONVERSIONS_PAGE_SIZE}&offset=${offset}`,
+      { credentials: "include", cache: "no-store" }
+    );
+    if (!res.ok) return [];
+    const rows: Conversion[] = await res.json();
+    return rows;
+  }
 
   useEffect(() => {
     (async () => {
-      const [liveRes, convRes] = await Promise.all([
-        fetch(`${API_BASE}/admin/exchange-rate/live`, { credentials: "include" }),
-        fetch(`${API_BASE}/admin/exchange-rate/conversions`, { credentials: "include" }),
+      const [liveRes, rows] = await Promise.all([
+        fetch(`${API_BASE}/admin/exchange-rate/live`, { credentials: "include", cache: "no-store" }),
+        loadConversions(0),
       ]);
       if (liveRes.ok) setLive(await liveRes.json());
-      if (convRes.ok) setConversions(await convRes.json());
+      setConversions(rows);
+      // The backend hard-caps each page at CONVERSIONS_PAGE_SIZE rows. A
+      // full page means there may be more rows beyond it; a short page
+      // means we've reached the end.
+      setHasMore(rows.length === CONVERSIONS_PAGE_SIZE);
       setLoading(false);
     })();
   }, []);
+
+  async function handleLoadMore() {
+    setLoadingMore(true);
+    try {
+      const rows = await loadConversions(conversions.length);
+      setConversions((prev) => [...prev, ...rows]);
+      setHasMore(rows.length === CONVERSIONS_PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <div>
@@ -69,6 +98,10 @@ export default function AdminExchangeRatePage() {
 
           <div className="admin-section">
             <h2 style={{ fontSize: 15, marginBottom: 12 }}>Applied conversions</h2>
+            <p className="hint" style={{ marginTop: -8, marginBottom: 12 }}>
+              Showing {conversions.length} conversion{conversions.length === 1 ? "" : "s"}
+              {hasMore ? " — more are available" : ""}.
+            </p>
             {conversions.length === 0 ? (
               <div className="empty">No non-USDC payments have been converted yet.</div>
             ) : (
@@ -96,6 +129,11 @@ export default function AdminExchangeRatePage() {
                   </tbody>
                 </table>
               </div>
+            )}
+            {hasMore && (
+              <button type="button" onClick={handleLoadMore} disabled={loadingMore} style={{ marginTop: 12 }}>
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
             )}
           </div>
         </>

@@ -34,8 +34,11 @@ export default function FeeSettlement({ address }: { address: string }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ text: string; error: boolean } | null>(null);
 
+  // Always-fresh reads: this is a balance check (fees owed), so a
+  // cached/stale response could understate or overstate what's actually
+  // owed right now.
   const load = useCallback(async () => {
-    const res = await fetch(`${API_BASE}/fees/owed`);
+    const res = await fetch(`${API_BASE}/fees/owed`, { cache: "no-store" });
     if (res.ok) {
       const body: { totals: OwedTotal[] } = await res.json();
       setTotals(body.totals);
@@ -44,7 +47,7 @@ export default function FeeSettlement({ address }: { address: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/fees/owed`)
+    fetch(`${API_BASE}/fees/owed`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((body: { totals: OwedTotal[] } | null) => {
         if (!cancelled && body) setTotals(body.totals);

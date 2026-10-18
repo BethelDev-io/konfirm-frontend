@@ -78,8 +78,13 @@ export default function GetTestUsdcPage() {
       window.open(startBody.url, "konfirm-deposit", "width=460,height=700");
 
       for (let i = 0; i < 150; i++) {
+        // Always-fresh read: this loop polls deposit status, so a
+        // cached/stale response could keep showing "pending" after the
+        // deposit has actually completed, errored, expired, or been
+        // refunded.
         const statusRes = await fetch(
           `${API_BASE}/deposits/status?token=${encodeURIComponent(tokenBody.token)}&id=${encodeURIComponent(startBody.id)}`,
+          { cache: "no-store" },
         );
         const txn = await statusRes.json();
         if (txn.status === "completed") {
