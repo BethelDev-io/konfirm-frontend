@@ -57,7 +57,7 @@ export default function AdminTreasuryPage() {
           <div className="stat-card">
             <div className="stat-label">USDC balance</div>
             <div className={`stat-value ${status.reachable ? "" : "stat-bad"}`}>
-              {status.reachable ? `$${status.usdc_balance}` : "unreachable"}
+              {status.reachable ? `$${Number(status.usdc_balance).toFixed(2)}` : "unreachable"}
             </div>
           </div>
           <div className="stat-card">
@@ -94,7 +94,7 @@ export default function AdminTreasuryPage() {
       </div>
 
       <div className="admin-section">
-        <h2>Signers ({status.threshold})</h2>
+        <h2>Signers ({status.signers.length})</h2>
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
