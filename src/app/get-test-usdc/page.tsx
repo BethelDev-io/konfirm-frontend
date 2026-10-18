@@ -11,8 +11,12 @@ type View = "step1" | "progress" | "step2" | "success";
 
 function friendlyMessage(err: unknown): string {
   const msg = String((err as Error)?.message || err || "");
-  if (msg.toLowerCase().includes("trustline")) return msg;
-  if (msg.toLowerCase().includes("not found")) return msg;
+  if (msg.toLowerCase().includes("trustline")) {
+    return "That address can't receive USDC yet — it needs a USDC trustline added first.";
+  }
+  if (msg.toLowerCase().includes("not found")) {
+    return "We couldn't find that account. Double-check the address and try again.";
+  }
   if (msg.toLowerCase().includes("declined") || msg.toLowerCase().includes("rejected")) {
     return "You'll need to approve the signature in your wallet to continue.";
   }
@@ -42,6 +46,7 @@ export default function GetTestUsdcPage() {
   useBeforeUnload(signingInFlight);
 
   function showProgress(stage: string) {
+    if (cancelled.current) return;
     setView("progress");
     setProgressStage(stage);
   }
@@ -89,10 +94,13 @@ export default function GetTestUsdcPage() {
       window.open(startBody.url, "konfirm-deposit", "width=460,height=700");
 
       for (let i = 0; i < 150; i++) {
+        if (cancelled.current) return;
         const statusRes = await fetch(
           `${API_BASE}/deposits/status?token=${encodeURIComponent(tokenBody.token)}&id=${encodeURIComponent(startBody.id)}`,
+          { cache: "no-store" },
         );
         const txn = await statusRes.json();
+        if (cancelled.current) return;
         if (txn.status === "completed") {
           setView("step2");
           return;
@@ -158,6 +166,7 @@ export default function GetTestUsdcPage() {
       }
       setSigningInFlight(false);
 
+      if (cancelled.current) return;
       setView("success");
     } catch (err) {
       reportError(err, { flow: "get-test-usdc", stage: "send" });

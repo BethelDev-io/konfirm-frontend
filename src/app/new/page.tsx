@@ -76,9 +76,15 @@ export default function NewPaymentPage() {
   }
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(linkUrl);
-    setCopyLabel("Copied");
-    setTimeout(() => setCopyLabel("Copy"), 1500);
+    try {
+      await navigator.clipboard.writeText(linkUrl);
+      setStatus("");
+      setCopyLabel("Copied");
+      setTimeout(() => setCopyLabel("Copy"), 1500);
+    } catch (err) {
+      console.error("[konfirm new-payment] clipboard", err);
+      setStatus("Couldn't copy — select and copy the link manually.");
+    }
   }
 
   function handleAnother() {
@@ -169,6 +175,7 @@ export default function NewPaymentPage() {
                 {copyLabel}
               </button>
             </div>
+            <div className={`status${status ? " error" : ""}`}>{status}</div>
             <button type="button" className="primary" onClick={() => window.location.assign(linkUrl)}>
               Open checkout
             </button>

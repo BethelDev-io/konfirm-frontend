@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
+import type { Metadata } from "next";
 import freighterApi from "@stellar/freighter-api";
 import qrcode from "qrcode-generator";
 import { API_BASE } from "@/lib/api";
@@ -43,7 +44,9 @@ function friendlyMessage(err: unknown): string {
     "this address is not permitted to pay",
     "pay-what-you-want links need an amount",
   ];
-  if (knownSafe.some((s) => msg.toLowerCase().includes(s))) return msg;
+  if (knownSafe.some((s) => msg.toLowerCase().includes(s))) {
+    return "This payment link isn't available right now. Please contact the merchant.";
+  }
   if (msg.toLowerCase().includes("declined") || msg.toLowerCase().includes("rejected")) {
     return "You'll need to approve the payment in your wallet to continue.";
   }
@@ -61,6 +64,11 @@ function randomMuxedId(): string {
   const low = BigInt(buf[1]);
   return ((high << 32n) | low).toString();
 }
+
+export const metadata: Metadata = {
+  title: "Checkout",
+  robots: { index: false, follow: false },
+};
 
 export default function CheckoutPage({ params }: { params: Promise<{ linkId: string }> }) {
   const { linkId } = use(params);
@@ -103,10 +111,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
     intervalMs: number,
   ): Promise<ConfirmedPayment | null> {
     for (let i = 0; i < attempts; i++) {
-      if (alreadyConfirmed.current) return null;
+      if (alreadyConfirmed.current || cancelledRef.current) return null;
       const res = await fetch(`${API_BASE}/links/${pollLinkId}/sessions/${muxedId}`);
+      if (cancelledRef.current) return null;
       if (res.ok) {
         const body: { confirmed: boolean; payment: { tx_hash: string } | null } = await res.json();
+        if (cancelledRef.current) return null;
         if (body.confirmed && body.payment) return { tx_hash: body.payment.tx_hash, muxed_id: muxedId };
       }
       await new Promise((r) => setTimeout(r, intervalMs));
@@ -148,6 +158,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
       const qr = qrcode(0, "M");
       qr.addData(body.uri);
       qr.make();
+      if (cancelledRef.current) return;
       setQrSvg(qr.createSvgTag(5, 8));
       setQrUri(body.uri);
     } catch (err) {
@@ -205,6 +216,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
       // deadline, since there's no way to know when someone might finish
       // scanning.
       const result = await pollForConfirmation(linkId, muxedId, 40, 2000);
+      if (cancelledRef.current) return;
 
       if (result) {
         showSuccess(result);
@@ -221,16 +233,23 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
   }
 
   useEffect(() => {
-    let cancelled = false;
+    cancelledRef.current = false;
+
+    // Scope confirmation state to this linkId: if this component instance is
+    // ever reused for a different link without a full remount, the new link
+    // must be able to confirm rather than silently no-op.
+    alreadyConfirmed.current = false;
+    sharedMuxedId.current = null;
 
     async function init() {
       const res = await fetch(`${API_BASE}/links/${linkId}/public`);
-      if (cancelled) return;
+      if (cancelledRef.current) return;
       if (!res.ok) {
         setLoadingText("This payment link could not be found.");
         return;
       }
       const data: LinkData = await res.json();
+      if (cancelledRef.current) return;
       setLinkData(data);
       try {
         sharedMuxedId.current = await reserveSessionWithRetry();
@@ -240,21 +259,24 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
         setShowQr(false);
         return;
       }
+      if (cancelledRef.current) return;
       // QR and mobile wallets pay the link amount. A platform fee on this
       // link is owed by the merchant and settled from their dashboard
       // (docs/design/qr-fee-collection.md, Option B), so it isn't added here.
       await setupQrPayment(sharedMuxedId.current);
+      if (cancelledRef.current) return;
       // Long, silent watch — up to 10 minutes — for the QR/mobile-wallet
       // path, which has no "just submitted" moment to bound the wait
       // against.
       pollForConfirmation(linkId, sharedMuxedId.current, 300, 2000).then((result) => {
+        if (cancelledRef.current) return;
         if (result) showSuccess(result);
       });
     }
 
     init();
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkId]);

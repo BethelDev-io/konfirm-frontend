@@ -1,6 +1,14 @@
-"use client";
+import type { Metadata } from "next";
+import AdminShell from "./AdminShell";
 
-import { usePathname, useRouter } from "next/navigation";
+export const metadata: Metadata = {
+  title: "Admin",
+  robots: { index: false, follow: false },
+};
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return <AdminShell>{children}</AdminShell>;
+}
 import Link from "next/link";
 import { apiPost } from "@/lib/api";
 import { useRequireAuth } from "@/lib/useAuth";
@@ -50,7 +58,7 @@ const NAV_GROUPS = [
   },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isLoginPage = pathname === "/admin/login";
