@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import freighterApi from "@stellar/freighter-api";
 import { API_BASE } from "@/lib/api";
 
@@ -9,8 +9,12 @@ type View = "step1" | "progress" | "step2" | "success";
 
 function friendlyMessage(err: unknown): string {
   const msg = String((err as Error)?.message || err || "");
-  if (msg.toLowerCase().includes("trustline")) return msg;
-  if (msg.toLowerCase().includes("not found")) return msg;
+  if (msg.toLowerCase().includes("trustline")) {
+    return "That address can't receive USDC yet — it needs a USDC trustline added first.";
+  }
+  if (msg.toLowerCase().includes("not found")) {
+    return "We couldn't find that account. Double-check the address and try again.";
+  }
   if (msg.toLowerCase().includes("declined") || msg.toLowerCase().includes("rejected")) {
     return "You'll need to approve the signature in your wallet to continue.";
   }
@@ -31,8 +35,17 @@ export default function GetTestUsdcPage() {
   const [amount, setAmount] = useState("5");
 
   const freighterAddress = useRef<string | null>(null);
+  const cancelled = useRef(false);
+
+  useEffect(() => {
+    cancelled.current = false;
+    return () => {
+      cancelled.current = true;
+    };
+  }, []);
 
   function showProgress(stage: string) {
+    if (cancelled.current) return;
     setView("progress");
     setProgressStage(stage);
   }
@@ -78,10 +91,12 @@ export default function GetTestUsdcPage() {
       window.open(startBody.url, "konfirm-deposit", "width=460,height=700");
 
       for (let i = 0; i < 150; i++) {
+        if (cancelled.current) return;
         const statusRes = await fetch(
           `${API_BASE}/deposits/status?token=${encodeURIComponent(tokenBody.token)}&id=${encodeURIComponent(startBody.id)}`,
         );
         const txn = await statusRes.json();
+        if (cancelled.current) return;
         if (txn.status === "completed") {
           setView("step2");
           return;
@@ -95,10 +110,11 @@ export default function GetTestUsdcPage() {
       throw new Error("timed out waiting for the deposit");
     } catch (err) {
       console.error("[konfirm get-test-usdc]", err);
+      if (cancelled.current) return;
       setView("step1");
       setStatus1(friendlyMessage(err));
     } finally {
-      setConnecting(false);
+      if (!cancelled.current) setConnecting(false);
     }
   }
 
@@ -144,13 +160,15 @@ export default function GetTestUsdcPage() {
         throw new Error(codes ? JSON.stringify(codes) : submitResult.title || "submission failed");
       }
 
+      if (cancelled.current) return;
       setView("success");
     } catch (err) {
       console.error("[konfirm get-test-usdc]", err);
+      if (cancelled.current) return;
       setView("step2");
       setStatus2(friendlyMessage(err));
     } finally {
-      setSending(false);
+      if (!cancelled.current) setSending(false);
     }
   }
 
