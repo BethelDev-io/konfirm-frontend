@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 interface UserRow {
   payer_address: string;
@@ -28,11 +28,16 @@ function shortAddress(address: string): string {
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(`${API_BASE}/admin/users`, { credentials: "include" });
-      if (res.ok) setUsers(await res.json());
+      const data = await apiFetch<UserRow[]>("/admin/users");
+      if (data) {
+        setUsers(data);
+      } else {
+        setError(true);
+      }
       setLoading(false);
     })();
   }, []);
@@ -47,6 +52,8 @@ export default function AdminUsersPage() {
 
       {loading ? (
         <div className="empty">Loading…</div>
+      ) : error ? (
+        <div className="empty">Could not load users — try again.</div>
       ) : users.length === 0 ? (
         <div className="empty">No payer activity yet.</div>
       ) : (

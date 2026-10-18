@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 interface LiveRate {
   rate: string | null;
@@ -29,15 +29,17 @@ export default function AdminExchangeRatePage() {
   const [live, setLive] = useState<LiveRate | null>(null);
   const [conversions, setConversions] = useState<Conversion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const [liveRes, convRes] = await Promise.all([
-        fetch(`${API_BASE}/admin/exchange-rate/live`, { credentials: "include" }),
-        fetch(`${API_BASE}/admin/exchange-rate/conversions`, { credentials: "include" }),
+      const [liveData, convData] = await Promise.all([
+        apiFetch<LiveRate>("/admin/exchange-rate/live"),
+        apiFetch<Conversion[]>("/admin/exchange-rate/conversions"),
       ]);
-      if (liveRes.ok) setLive(await liveRes.json());
-      if (convRes.ok) setConversions(await convRes.json());
+      if (liveData) setLive(liveData);
+      if (convData) setConversions(convData);
+      if (!liveData || !convData) setError(true);
       setLoading(false);
     })();
   }, []);
@@ -69,7 +71,9 @@ export default function AdminExchangeRatePage() {
 
           <div className="admin-section">
             <h2 style={{ fontSize: 15, marginBottom: 12 }}>Applied conversions</h2>
-            {conversions.length === 0 ? (
+            {error ? (
+              <div className="empty">Could not load exchange rate — try again.</div>
+            ) : conversions.length === 0 ? (
               <div className="empty">No non-USDC payments have been converted yet.</div>
             ) : (
               <div className="admin-table-wrap">

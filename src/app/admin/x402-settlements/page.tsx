@@ -38,11 +38,17 @@ export default function AdminX402SettlementsPage() {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [filter, setFilter] = useState<"" | SettlementStatus>("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   async function load() {
     setLoading(true);
+    setError(false);
     const result = await apiFetch<Settlement[]>("/admin/x402-settlements");
-    if (result.ok) setSettlements(result.data);
+    if (result.ok && result.data) {
+      setSettlements(result.data);
+    } else {
+      setError(true);
+    }
     setLoading(false);
   }
 
@@ -103,6 +109,8 @@ export default function AdminX402SettlementsPage() {
       <div className="admin-section">
         {loading ? (
           <div className="empty">Loading…</div>
+        ) : error ? (
+          <div className="empty">Could not load settlements — try again.</div>
         ) : visible.length === 0 ? (
           <div className="empty">No settlements match this filter.</div>
         ) : (

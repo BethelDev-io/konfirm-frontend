@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, apiFetch } from "@/lib/api";
 
 type PaymentStatus = "paid" | "held" | "disputed";
 
@@ -53,10 +53,19 @@ export default function AdminPaymentsPage() {
 
   async function load(status: string) {
     setLoading(true);
+    setError("");
     const url = status ? `${API_BASE}/admin/payments?status=${status}` : `${API_BASE}/admin/payments`;
-    const res = await fetch(url, { credentials: "include" });
-    if (res.ok) setPayments(await res.json());
-    setLoading(false);
+    try {
+      const res = await apiFetch(url);
+      if (!res.ok) throw new Error("Could not load payments — try again.");
+      setPayments(await res.json());
+    } catch (err) {
+      console.error("[konfirm admin] payments load failed", err);
+      setPayments([]);
+      setError("Could not load payments — try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -67,20 +76,33 @@ export default function AdminPaymentsPage() {
 
   async function changeStatus(payment: Payment, status: PaymentStatus) {
     if (status === payment.status) return;
-    let reason: string | null = "";
-    if (status !== "paid") {
-      reason = window.prompt(`Reason for marking this payment "${status}" (optional, shown in the activity log):`, "");
-      if (reason === null) return;
+
+    const flagDescription = payment.flag_reason
+      ? FLAG_LABEL[payment.flag_reason] ?? payment.flag_reason
+      : null;
+    const consequence =
+      status === "paid" && (payment.status === "disputed" || payment.status === "held")
+        ? `This will clear the "${payment.status}" flag${flagDescription ? ` (${flagDescription})` : ""} and mark the payment as paid.`
+        : `This will change the payment status from "${payment.status}" to "${status}".`;
+    if (!window.confirm(`${consequence}\n\nAre you sure?`)) return;
+
+    const reason = window.prompt(
+      `Reason for marking this payment "${status}" (required, shown in the activity log):`,
+      ""
+    );
+    if (reason === null) return;
+    if (!reason.trim()) {
+      setError("A reason is required for every payment status change.");
+      return;
     }
 
     setPendingId(payment.id);
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/admin/payments/${payment.id}/status`, {
+      const res = await apiFetch(`${API_BASE}/admin/payments/${payment.id}/status`, {
         method: "PATCH",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, reason: reason || undefined }),
+        body: JSON.stringify({ status, reason: reason.trim() }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -116,6 +138,8 @@ export default function AdminPaymentsPage() {
       <div className="admin-section">
         {loading ? (
           <div className="empty">Loading…</div>
+        ) : error && payments.length === 0 ? (
+          <div className="empty">Could not load payments — try again.</div>
         ) : payments.length === 0 ? (
           <div className="empty">No payments match this filter.</div>
         ) : (
@@ -168,7 +192,7 @@ export default function AdminPaymentsPage() {
             </table>
           </div>
         )}
-        {error && <div className="status error">{error}</div>}
+        {error && payments.length > 0 && <div className="status error">{error}</div>}
       </div>
     </div>
   );

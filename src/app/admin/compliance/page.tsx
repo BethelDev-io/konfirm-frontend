@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { API_BASE } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 interface BlockedAddress {
   id: string;
@@ -23,10 +23,16 @@ export default function AdminCompliancePage() {
   const [submitting, setSubmitting] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState(false);
 
   async function load() {
-    const res = await fetch(`${API_BASE}/admin/compliance/blocked-addresses`, { credentials: "include" });
-    if (res.ok) setBlocked(await res.json());
+    const data = await apiFetch<BlockedAddress[]>("/admin/compliance/blocked-addresses");
+    if (data) {
+      setBlocked(data);
+      setLoadError(false);
+    } else {
+      setLoadError(true);
+    }
     setLoading(false);
   }
 
@@ -121,6 +127,8 @@ export default function AdminCompliancePage() {
       <div className="admin-section">
         {loading ? (
           <div className="empty">Loading…</div>
+        ) : loadError ? (
+          <div className="empty">Could not load blocked addresses — try again.</div>
         ) : blocked.length === 0 ? (
           <div className="empty">No addresses blocked.</div>
         ) : (

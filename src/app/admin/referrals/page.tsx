@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 interface ReferralRow {
   id: string;
@@ -21,11 +21,17 @@ function formatDate(iso: string): string {
 export default function AdminReferralsPage() {
   const [referrals, setReferrals] = useState<ReferralRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(`${API_BASE}/admin/referrals`, { credentials: "include" });
-      if (res.ok) setReferrals(await res.json());
+      const data = await apiFetch<ReferralRow[]>("/admin/referrals");
+      if (data) {
+        setReferrals(data);
+        setError(false);
+      } else {
+        setError(true);
+      }
       setLoading(false);
     })();
   }, []);
@@ -40,6 +46,8 @@ export default function AdminReferralsPage() {
 
       {loading ? (
         <div className="empty">Loading…</div>
+      ) : error ? (
+        <div className="empty">Could not load referrals — try again.</div>
       ) : referrals.length === 0 ? (
         <div className="empty">No referrals yet.</div>
       ) : (

@@ -20,11 +20,16 @@ function formatDate(iso: string): string {
 export default function AdminNotificationsPage() {
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     (async () => {
       const result = await apiFetch<Notification[]>("/admin/notifications");
-      if (result.ok) setItems(result.data);
+      if (result.ok && result.data) {
+        setItems(result.data);
+      } else {
+        setError(true);
+      }
       setLoading(false);
     })();
   }, []);
@@ -62,6 +67,8 @@ export default function AdminNotificationsPage() {
       <div className="admin-section">
         {loading ? (
           <div className="empty">Loading…</div>
+        ) : error ? (
+          <div className="empty">Could not load notifications — try again.</div>
         ) : items.length === 0 ? (
           <div className="empty">Nothing to flag right now.</div>
         ) : (
