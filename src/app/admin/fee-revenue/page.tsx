@@ -19,7 +19,7 @@ function formatUsdc(amount: string): string {
 }
 
 function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString();
+  return `${new Date(iso).toLocaleDateString(undefined, { timeZone: "UTC" })} UTC`;
 }
 
 export default function AdminFeeRevenuePage() {
@@ -72,7 +72,7 @@ export default function AdminFeeRevenuePage() {
                 <table className="admin-table">
                   <thead>
                     <tr>
-                      <th>Day</th>
+                      <th>Day (UTC)</th>
                       <th>Payments</th>
                       <th>Fee revenue</th>
                     </tr>

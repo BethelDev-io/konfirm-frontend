@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { apiFetch, apiPatch } from "@/lib/api";
+import { formatUtcTimestamp } from "@/lib/format";
 
 type ListingStatus = "pending" | "approved" | "rejected";
 
@@ -22,7 +23,7 @@ interface Listing {
 const STATUS_OPTIONS: ListingStatus[] = ["pending", "approved", "rejected"];
 
 function formatDate(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString() : "—";
+  return iso ? formatUtcTimestamp(iso) : "—";
 }
 
 export default function AdminBazaarPage() {
@@ -101,7 +102,7 @@ export default function AdminBazaarPage() {
                   <th>Network</th>
                   <th>Contact</th>
                   <th>Status</th>
-                  <th>Submitted</th>
+                  <th>Submitted (UTC)</th>
                   <th></th>
                 </tr>
               </thead>

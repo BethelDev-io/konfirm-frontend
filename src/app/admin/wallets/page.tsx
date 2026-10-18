@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
+import { formatUtc } from "@/lib/format";
 
 interface WalletRow {
   address: string;

@@ -4,6 +4,7 @@ import { Suspense, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { API_BASE } from "@/lib/api";
+import { reportError } from "@/lib/report-error";
 
 function SignupForm() {
   const router = useRouter();
@@ -45,7 +46,7 @@ function SignupForm() {
       }
       router.push("/activity");
     } catch (err) {
-      console.error("[konfirm signup]", err);
+      reportError("signup", err);
       setStatus(err instanceof Error ? err.message : "Could not create your account. Please try again.");
       setSubmitting(false);
     }

@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import freighterApi from "@stellar/freighter-api";
 import { API_BASE } from "@/lib/api";
+import { reportError } from "@/lib/report-error";
+import { useBeforeUnload } from "@/lib/use-before-unload";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 type View = "step1" | "progress" | "step2" | "success";
@@ -35,14 +37,13 @@ export default function GetTestUsdcPage() {
   const [amount, setAmount] = useState("5");
 
   const freighterAddress = useRef<string | null>(null);
-  const cancelled = useRef(false);
+  const signingInFlight = useRef(false);
 
-  useEffect(() => {
-    cancelled.current = false;
-    return () => {
-      cancelled.current = true;
-    };
+  const setSigningInFlight = useCallback((value: boolean) => {
+    signingInFlight.current = value;
   }, []);
+
+  useBeforeUnload(signingInFlight);
 
   function showProgress(stage: string) {
     if (cancelled.current) return;
@@ -65,6 +66,7 @@ export default function GetTestUsdcPage() {
       if (!challengeRes.ok) throw new Error(challenge.message || "could not reach the test-funds partner");
 
       showProgress("Approve the sign-in in your wallet…");
+      setSigningInFlight(true);
       const signedChallenge = await freighterApi.signTransaction(challenge.transaction, {
         networkPassphrase: challenge.network_passphrase,
         address: freighterAddress.current,
@@ -78,6 +80,7 @@ export default function GetTestUsdcPage() {
       });
       const tokenBody = await tokenRes.json();
       if (!tokenRes.ok) throw new Error(tokenBody.message || "the test-funds partner rejected that signature");
+      setSigningInFlight(false);
 
       showProgress("Opening the deposit form…");
       const startRes = await fetch(`${API_BASE}/deposits/start`, {
@@ -110,12 +113,12 @@ export default function GetTestUsdcPage() {
       }
       throw new Error("timed out waiting for the deposit");
     } catch (err) {
-      console.error("[konfirm get-test-usdc]", err);
-      if (cancelled.current) return;
+      reportError(err, { flow: "get-test-usdc", stage: "connect" });
       setView("step1");
       setStatus1(friendlyMessage(err));
     } finally {
-      if (!cancelled.current) setConnecting(false);
+      setSigningInFlight(false);
+      setConnecting(false);
     }
   }
 
@@ -143,6 +146,7 @@ export default function GetTestUsdcPage() {
       if (!prepRes.ok) throw new Error(prep.message || "could not prepare the transfer");
 
       showProgress("Approve the transfer in your wallet…");
+      setSigningInFlight(true);
       const signed = await freighterApi.signTransaction(prep.xdr, {
         networkPassphrase: prep.network_passphrase,
         address: freighterAddress.current!,
@@ -160,16 +164,17 @@ export default function GetTestUsdcPage() {
         const codes = submitResult.extras?.result_codes;
         throw new Error(codes ? JSON.stringify(codes) : submitResult.title || "submission failed");
       }
+      setSigningInFlight(false);
 
       if (cancelled.current) return;
       setView("success");
     } catch (err) {
-      console.error("[konfirm get-test-usdc]", err);
-      if (cancelled.current) return;
+      reportError(err, { flow: "get-test-usdc", stage: "send" });
       setView("step2");
       setStatus2(friendlyMessage(err));
     } finally {
-      if (!cancelled.current) setSending(false);
+      setSigningInFlight(false);
+      setSending(false);
     }
   }
 

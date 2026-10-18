@@ -61,3 +61,15 @@ export function useRequireAuth<T = unknown>(options: UseRequireAuthOptions<T>): 
 
   return { resolved, data };
 }
+
+// Single shared timestamp formatter for admin pages. The backend stores
+// timestamps in UTC, so every admin-visible timestamp is pinned to UTC
+// explicitly (rather than implicitly using the viewer's browser-local zone)
+// and labelled with a visible "UTC" suffix so it's unambiguous without
+// relying on the viewer's own clock. Returns "—" for missing values.
+export function formatTimestamp(iso: string | null): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return `${date.toLocaleString(undefined, { timeZone: "UTC" })} UTC`;
+}

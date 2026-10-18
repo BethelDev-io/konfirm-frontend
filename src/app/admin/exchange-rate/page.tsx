@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
+import { formatUtcTimestamp } from "@/lib/format";
 
 interface LiveRate {
   rate: string | null;
@@ -21,9 +22,6 @@ function shortAddress(address: string): string {
   return `${address.slice(0, 4)}…${address.slice(-4)}`;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
 
 const CONVERSIONS_PAGE_SIZE = 50;
 
@@ -123,7 +121,7 @@ export default function AdminExchangeRatePage() {
                         <td className="mono">{shortAddress(c.payer_address)}</td>
                         <td className="mono">{Number(c.fx_rate_to_usd).toFixed(7)}</td>
                         <td className="mono">${Number(c.amount_usdc).toFixed(2)}</td>
-                        <td>{formatDate(c.created_at)}</td>
+                        <td>{formatUtcTimestamp(c.created_at)}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import freighterApi from "@stellar/freighter-api";
 import { API_BASE } from "@/lib/api";
+import { reportError } from "@/lib/report-error";
 
 // Merchant-side fee settlement (docs/design/qr-fee-collection.md, Option B).
 // Shows what the merchant owes, then clears it in one transaction they sign in
@@ -52,7 +53,7 @@ export default function FeeSettlement({ address }: { address: string }) {
       .then((body: { totals: OwedTotal[] } | null) => {
         if (!cancelled && body) setTotals(body.totals);
       })
-      .catch((err) => console.error("[konfirm fees] could not load owed fees", err));
+      .catch((err) => reportError(err, { tags: { area: "fee-settlement", action: "load-owed-fees" } }));
     return () => {
       cancelled = true;
     };
@@ -85,7 +86,7 @@ export default function FeeSettlement({ address }: { address: string }) {
       setStatus({ text: "Fees settled. Thank you.", error: false });
       await load();
     } catch (err) {
-      console.error("[konfirm fees] settlement failed", err);
+      reportError(err, { tags: { area: "fee-settlement", action: "settle" } });
       setStatus({
         text: err instanceof Error && (err as Error & { handled?: boolean }).handled
           ? err.message
