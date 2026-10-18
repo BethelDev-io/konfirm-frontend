@@ -57,6 +57,8 @@ function ActivityContent() {
   const showNav = Boolean(merchant);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [pending, setPending] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const poll = useCallback(async () => {
     if (!hasAddress) return;
@@ -106,6 +108,8 @@ function ActivityContent() {
     });
   const hasBalances = Object.keys(totals).length > 0;
 
+  const filteredPayments = statusFilter === "all" ? payments : payments.filter((p) => p.status === statusFilter);
+
   return (
     <div className="wrap">
       <div className="header-row">
@@ -150,30 +154,123 @@ function ActivityContent() {
         {hasAddress && payments.length === 0 && !pending && (
           <div className="empty">No payments yet — this updates the instant one lands.</div>
         )}
-        {payments.map((p) => (
-          <div className="payment" key={p.id}>
-            <div className="left">
-              <div className="tick">✓</div>
-              <div className="desc">
-                {p.link_description || "Payment"}
-                <div className="from">
-                  from {p.payer_address.slice(0, 4)}…{p.payer_address.slice(-4)}
-                </div>
-                {p.fee_status === "owed" && p.fee_owed_raw && (
+        {hasAddress && payments.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <label htmlFor="status-filter" style={{ marginRight: 8, fontSize: 14 }}>
+              Filter by status:
+            </label>
+            <select
+              id="status-filter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{ fontSize: 14, padding: "2px 6px" }}
+            >
+              <option value="all">All</option>
+              <option value="paid">Paid</option>
+              <option value="held">Held</option>
+              <option value="refunded">Refunded</option>
+              <option value="disputed">Disputed</option>
+            </select>
+            {statusFilter !== "all" && (
+              <span style={{ marginLeft: 12, fontSize: 13, opacity: 0.7 }}>
+                {filteredPayments.length} of {payments.length} payments
+              </span>
+            )}
+          </div>
+        )}
+        {filteredPayments.map((p) => (
+          <div key={p.id}>
+            <div
+              className="payment"
+              onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
+              style={{ cursor: "pointer" }}
+              role="button"
+              aria-expanded={expandedId === p.id}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setExpandedId(expandedId === p.id ? null : p.id);
+              }}
+            >
+              <div className="left">
+                <div className="tick">✓</div>
+                <div className="desc">
+                  {p.link_description || "Payment"}
                   <div className="from">
-                    Fee owed {p.fee_owed_raw} {p.fee_asset_code}
+                    from {p.payer_address.slice(0, 4)}…{p.payer_address.slice(-4)}
                   </div>
-                )}
-                {p.status === "held" && (
-                  <div className="from" role="status">
-                    {HOLD_REASON_TEXT[p.flag_reason ?? ""] ?? HOLD_FALLBACK}
-                  </div>
-                )}
+                  {p.fee_status === "owed" && p.fee_owed_raw && (
+                    <div className="from">
+                      Fee owed {p.fee_owed_raw} {p.fee_asset_code}
+                    </div>
+                  )}
+                  {p.status === "held" && (
+                    <div className="from" role="status">
+                      {HOLD_REASON_TEXT[p.flag_reason ?? ""] ?? HOLD_FALLBACK}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="amount">
+                {p.status === "held" ? "On hold" : formatAmount(Number(p.net_usdc), p.asset_code)}
               </div>
             </div>
-            <div className="amount">
-              {p.status === "held" ? "On hold" : formatAmount(Number(p.net_usdc), p.asset_code)}
-            </div>
+            {expandedId === p.id && (
+              <div
+                style={{
+                  background: "var(--card-bg, #f9f9f9)",
+                  border: "1px solid var(--border, #e0e0e0)",
+                  borderTop: "none",
+                  borderRadius: "0 0 6px 6px",
+                  padding: "12px 16px",
+                  fontSize: 13,
+                }}
+              >
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 24px" }}>
+                  <div>
+                    <strong>Payment ID</strong>
+                    <div className="mono" style={{ fontSize: 12, wordBreak: "break-all" }}>
+                      {p.id}
+                    </div>
+                  </div>
+                  <div>
+                    <strong>Status</strong>
+                    <div>{p.status}</div>
+                  </div>
+                  <div>
+                    <strong>Payer address</strong>
+                    <div className="mono" style={{ fontSize: 12, wordBreak: "break-all" }}>
+                      {p.payer_address}
+                    </div>
+                  </div>
+                  <div>
+                    <strong>Asset</strong>
+                    <div>{p.asset_code}</div>
+                  </div>
+                  <div>
+                    <strong>Amount</strong>
+                    <div>{p.status === "held" ? "On hold" : formatAmount(Number(p.net_usdc), p.asset_code)}</div>
+                  </div>
+                  <div>
+                    <strong>Fee status</strong>
+                    <div>{p.fee_status}</div>
+                  </div>
+                  {p.fee_status === "owed" && p.fee_owed_raw && (
+                    <div>
+                      <strong>Fee owed</strong>
+                      <div>
+                        {p.fee_owed_raw} {p.fee_asset_code}
+                      </div>
+                    </div>
+                  )}
+                  {p.status === "held" && p.flag_reason && (
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <strong>Hold reason</strong>
+                      <div>{HOLD_REASON_TEXT[p.flag_reason] ?? HOLD_FALLBACK}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
