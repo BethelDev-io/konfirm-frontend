@@ -42,19 +42,40 @@ export function useRequireAuth<T = unknown>(options: UseRequireAuthOptions<T>): 
   useEffect(() => {
     if (skip) return;
     let cancelled = false;
-    (async () => {
-      const res = await fetch(`${API_BASE}${meEndpoint}`, { credentials: "include" });
-      if (cancelled) return;
-      if (!res.ok) {
-        router.push(loginPath);
-        return;
+
+    function check() {
+      (async () => {
+        const res = await fetch(`${API_BASE}${meEndpoint}`, { credentials: "include" });
+        if (cancelled) return;
+        if (!res.ok) {
+          router.push(loginPath);
+          return;
+        }
+        const body = await res.json();
+        setData(select ? select(body) : (body as T));
+        setResolved(true);
+      })();
+    }
+
+    check();
+
+    // When a page is restored from the back/forward cache (bfcache), the
+    // component tree is reused as-is and this effect does NOT re-run, so a
+    // stale session could otherwise keep rendering a previously-authed
+    // admin page without re-checking auth. `pageshow` fires on every
+    // navigation, including bfcache restores, and `event.persisted` is
+    // true only for the latter — re-run the auth check in that case.
+    function onPageShow(event: PageTransitionEvent) {
+      if (event.persisted) {
+        setResolved(false);
+        check();
       }
-      const body = await res.json();
-      setData(select ? select(body) : (body as T));
-      setResolved(true);
-    })();
+    }
+    window.addEventListener("pageshow", onPageShow);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("pageshow", onPageShow);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [skip, meEndpoint, loginPath]);
