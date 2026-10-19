@@ -91,7 +91,7 @@ export default function GetTestUsdcPage() {
       const startBody = await startRes.json();
       if (!startRes.ok) throw new Error(startBody.message || "could not start a deposit");
 
-      window.open(startBody.url, "konfirm-deposit", "width=460,height=700");
+      window.open(startBody.url, "konfirm-deposit", "width=460,height=700,noopener,noreferrer");
 
       for (let i = 0; i < 150; i++) {
         if (cancelled.current) return;
