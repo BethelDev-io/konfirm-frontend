@@ -37,6 +37,10 @@ function daysLeft(iso: string): number {
   return Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
 }
 
+function formatDaysLeft(days: number): string {
+  return `${days} day${days === 1 ? "" : "s"} left`;
+}
+
 function PromoBanner({ promo }: { promo: Promo }) {
   if (!promo.active) {
     return <div className="admin-section hint">Your promotional rate has ended — standard fees now apply.</div>;
@@ -45,7 +49,7 @@ function PromoBanner({ promo }: { promo: Promo }) {
   const label = isFree ? "0% fees" : `${(promo.feeBps! / 100).toFixed(2)}% fees`;
   return (
     <div className="admin-section" style={{ borderColor: "var(--accent, #5b8def)" }}>
-      <div style={{ fontWeight: 600, marginBottom: 4 }}>{label} active{promo.expiresAt ? ` — ${daysLeft(promo.expiresAt)} days left` : ""}</div>
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>{label} active{promo.expiresAt ? ` — ${formatDaysLeft(daysLeft(promo.expiresAt))}` : ""}</div>
       {promo.volumeCapUsdc && (
         <div className="hint">
           ${Number(promo.volumeSoFarUsdc).toFixed(2)} of ${Number(promo.volumeCapUsdc).toFixed(2)} processed at this rate
