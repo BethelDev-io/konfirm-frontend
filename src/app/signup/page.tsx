@@ -106,6 +106,7 @@ function SignupForm() {
               id="address"
               type="text"
               placeholder="G..."
+              spellCheck={false}
               required
               value={address}
               onChange={(e) => setAddress(e.target.value)}

@@ -219,7 +219,7 @@ export default function GetTestUsdcPage() {
             <p className="sub">Test USDC landed in your Freighter account. Now send some to the wallet you&apos;re actually testing with.</p>
             <div className="field">
               <label htmlFor="dest">Destination address</label>
-              <input id="dest" type="text" placeholder="G..." autoComplete="off" value={dest} onChange={(e) => setDest(e.target.value)} />
+              <input id="dest" type="text" placeholder="G..." autoComplete="off" spellCheck={false} value={dest} onChange={(e) => setDest(e.target.value)} />
               <div className="hint">Must already have a USDC trustline — Konfirm can&apos;t add one for an address it never signs with.</div>
             </div>
             <div className="field">
