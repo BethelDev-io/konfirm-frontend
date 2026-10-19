@@ -54,6 +54,7 @@ export default function CashoutPage() {
   const cancelled = useRef(false);
   const paymentSubmitted = useRef(false);
   const signingInFlight = useRef(false);
+  const inFlight = useRef(false);
   useBeforeUnload(signingInFlight);
 
   // Ref mutation (not React state) in response to an external value
@@ -77,6 +78,7 @@ export default function CashoutPage() {
   }
 
   function showFormError(msg: string) {
+    inFlight.current = false;
     setView("form");
     setStatus(msg);
     setStarting(false);
@@ -160,6 +162,8 @@ export default function CashoutPage() {
   }
 
   async function handleStart() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setStarting(true);
     paymentSubmitted.current = false;
     cancelled.current = false;
@@ -201,6 +205,7 @@ export default function CashoutPage() {
       if (!startRes.ok) throw new Error(startBody.message || "could not start a cash-out");
 
       signingInFlight.current = false;
+      inFlight.current = false;
       window.open(startBody.url, "konfirm-cashout", "width=460,height=700");
       pollStatus(tokenBody.token, startBody.id);
     } catch (err) {
@@ -211,6 +216,7 @@ export default function CashoutPage() {
   }
 
   function handleAnother() {
+    inFlight.current = false;
     setView("form");
     setStarting(false);
     setStatus("");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiPost } from "@/lib/api";
@@ -32,8 +32,10 @@ export default function NewPaymentPage() {
   const [linkUrl, setLinkUrl] = useState("");
   const [copyLabel, setCopyLabel] = useState("Copy");
   const [showResult, setShowResult] = useState(false);
+  const inFlight = useRef(false);
 
   async function handleSubmit() {
+    if (inFlight.current) return;
     const amountRaw = amount.trim();
     setStatus("");
 
@@ -43,6 +45,7 @@ export default function NewPaymentPage() {
       return;
     }
 
+    inFlight.current = true;
     setSubmitting(true);
     try {
       const result = await apiPost<{ id: string }>("/links", {
@@ -71,6 +74,7 @@ export default function NewPaymentPage() {
       reportError(err, { tags: { area: "new-payment", action: "create-link" } });
       setStatus(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
+      inFlight.current = false;
       setSubmitting(false);
     }
   }

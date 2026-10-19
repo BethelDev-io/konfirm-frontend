@@ -90,6 +90,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
   // beforeunload prompt never fires during passive polling or idle states.
   const operationInFlight = useRef(false);
   useBeforeUnload(operationInFlight);
+  const connectInFlight = useRef(false);
 
   function setStatusMsg(msg: string, isError = false) {
     setStatus(msg);
@@ -169,6 +170,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
   }
 
   async function handleConnect() {
+    if (connectInFlight.current) return;
+    connectInFlight.current = true;
     setConnecting(true);
     operationInFlight.current = true;
     try {
@@ -229,6 +232,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
       setStatusMsg(friendlyMessage(err), true);
     } finally {
       operationInFlight.current = false;
+      connectInFlight.current = false;
       setConnecting(false);
     }
   }
