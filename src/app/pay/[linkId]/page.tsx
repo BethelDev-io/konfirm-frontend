@@ -82,6 +82,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
   const [statusIsError, setStatusIsError] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [confirmed, setConfirmed] = useState<ConfirmedPayment | null>(null);
+  const [linkInactive, setLinkInactive] = useState(false);
 
   const alreadyConfirmed = useRef(false);
   const sharedMuxedId = useRef<string | null>(null);
@@ -257,6 +258,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
         reportError(err, { tags: { flow: "checkout", stage: "reserve-session", linkId } });
         setStatusMsg(friendlyMessage(err), true);
         setShowQr(false);
+        setLinkInactive(true);
         return;
       }
       if (cancelledRef.current) return;
@@ -344,9 +346,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
               </>
             )}
 
-            <button type="button" className="primary" disabled={connecting} onClick={handleConnect}>
-              Connect Freighter &amp; Pay
-            </button>
+            {!linkInactive && (
+              <button type="button" className="primary" disabled={connecting} onClick={handleConnect}>
+                Connect Freighter &amp; Pay
+              </button>
+            )}
             <div className={`status${statusIsError ? " error" : ""}`}>{status}</div>
           </div>
         )}
