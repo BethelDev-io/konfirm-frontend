@@ -117,6 +117,8 @@ function ActivityContent() {
             <Link href="/new">+ New payment</Link>
             <Link href="/links">My links</Link>
             <Link href="/cashout">Cash out</Link>
+            <Link href="/referrals">Referrals</Link>
+            <Link href="/docs">Docs</Link>
             <button type="button" onClick={handleLogout}>
               Log out
             </button>
