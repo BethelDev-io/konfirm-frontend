@@ -172,7 +172,17 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
     operationInFlight.current = true;
     try {
       setStatusMsg(STAGE.CONNECT);
-      const access = await freighterApi.requestAccess();
+      // When the Freighter extension isn't installed, requestAccess()
+      // never resolves at all (there's no content script to answer its
+      // postMessage) rather than rejecting, so the UI would otherwise hang
+      // forever on "Connecting...". Race it against a short timeout and
+      // surface a normal, actionable error instead.
+      const access = await Promise.race([
+        freighterApi.requestAccess(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Freighter wallet not detected")), 3000)
+        ),
+      ]);
       if (access.error) throw new Error(access.error);
       const payerAddress = access.address;
 
