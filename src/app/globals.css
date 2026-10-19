@@ -266,6 +266,24 @@ button.secondary {
   margin-bottom: 24px;
 }
 
+/* Forced colors (e.g. Windows High Contrast) strip custom backgrounds, so
+   anything that only communicated state via `background: var(--accent)`
+   — the primary button and the active currency toggle — can disappear
+   into the surrounding surface. Give them an explicit border and rely on
+   system colors so the shapes and active state stay visible. */
+@media (forced-colors: active) {
+  button.primary {
+    border: 2px solid ButtonText;
+  }
+  .ctoggle {
+    border: 1px solid ButtonText;
+  }
+  .ctoggle.active {
+    border: 2px solid Highlight;
+    outline: 1px solid Highlight;
+  }
+}
+
 /* Amount hero (new) */
 .amount-row {
   display: flex;
