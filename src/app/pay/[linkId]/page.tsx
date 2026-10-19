@@ -82,9 +82,15 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
   const [statusIsError, setStatusIsError] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [confirmed, setConfirmed] = useState<ConfirmedPayment | null>(null);
+  // Set when another session (another tab/window on this same browser, or
+  // another device entirely via the shared BroadcastChannel below) is
+  // actively paying this same link right now — lets us warn rather than
+  // let two sessions race through checkout looking identical.
+  const [otherSessionPaying, setOtherSessionPaying] = useState(false);
 
   const alreadyConfirmed = useRef(false);
   const sharedMuxedId = useRef<string | null>(null);
+  const broadcastRef = useRef<BroadcastChannel | null>(null);
   // True only while a payment is being signed/submitted/confirmed, so the
   // beforeunload prompt never fires during passive polling or idle states.
   const operationInFlight = useRef(false);
@@ -99,6 +105,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
     if (alreadyConfirmed.current) return; // either path can win; only act on the first
     alreadyConfirmed.current = true;
     setConfirmed(payment);
+    broadcastRef.current?.postMessage({ type: "confirmed" });
   }
 
   // Asks only about this payer's own session, so a checkout page never
@@ -170,6 +177,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
   async function handleConnect() {
     setConnecting(true);
     operationInFlight.current = true;
+    broadcastRef.current?.postMessage({ type: "paying" });
     try {
       setStatusMsg(STAGE.CONNECT);
       const access = await freighterApi.requestAccess();
@@ -240,6 +248,25 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
     // must be able to confirm rather than silently no-op.
     alreadyConfirmed.current = false;
     sharedMuxedId.current = null;
+    setOtherSessionPaying(false);
+
+    // Same-browser cross-session awareness: a visitor who opens this same
+    // checkout link in two tabs (or two devices sync the tab) should see
+    // that someone is already paying, instead of two identical-looking
+    // checkouts racing each other silently. BroadcastChannel only reaches
+    // other tabs/windows of this same browser on this same origin — it
+    // can't see a genuinely different device's session, which would need
+    // a server-side link status check.
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      channel = new BroadcastChannel(`konfirm-pay-${linkId}`);
+      broadcastRef.current = channel;
+      channel.onmessage = (event) => {
+        const msg = event.data as { type?: string };
+        if (msg?.type === "paying") setOtherSessionPaying(true);
+        if (msg?.type === "confirmed") setOtherSessionPaying(false);
+      };
+    }
 
     async function init() {
       const res = await fetch(`${API_BASE}/links/${linkId}/public`);
@@ -277,6 +304,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
     init();
     return () => {
       cancelledRef.current = true;
+      channel?.close();
+      broadcastRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkId]);
@@ -320,6 +349,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
               </>
             ) : (
               <div className="amount-display">{amountDisplay}</div>
+            )}
+
+            {otherSessionPaying && (
+              <div className="status" style={{ marginBottom: 12 }}>
+                This link is already being paid in another tab or window. You don&apos;t need to pay again.
+              </div>
             )}
 
             {showQr && (
