@@ -125,6 +125,11 @@ label {
 .footer a {
   color: var(--accent);
   text-decoration: none;
+  display: inline-block;
+  min-height: 24px;
+  min-width: 24px;
+  padding: 4px 2px;
+  line-height: 16px;
 }
 .footer a:hover {
   text-decoration: underline;
