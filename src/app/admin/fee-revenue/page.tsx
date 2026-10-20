@@ -1,4 +1,5 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
@@ -50,7 +51,7 @@ export default function AdminFeeRevenuePage() {
       </p>
 
       {loading ? (
-        <div className="empty">Loading…</div>
+        <LoadingSpinner stallThreshold={3000} />
       ) : (
         <>
           <div className="admin-section">

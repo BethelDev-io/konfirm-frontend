@@ -1,4 +1,5 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
@@ -159,7 +160,7 @@ export default function AdminMerchantsPage() {
 
       <div className="admin-section">
         {loading ? (
-          <div className="empty">Loading…</div>
+          <LoadingSpinner />
         ) : loadError ? (
           <div className="empty">Could not load merchants — try again.</div>
         ) : merchants.length === 0 ? (
@@ -203,17 +204,19 @@ export default function AdminMerchantsPage() {
                     <td className="mono">{shortAddress(m.stellar_base_address)}</td>
                     <td>{formatDate(m.created_at)}</td>
                     <td>
-                      <button type="button" disabled={pendingId === m.id} onClick={() => toggleStatus(m)}>
-                        {m.status === "suspended" ? "Reactivate" : "Suspend"}
-                      </button>{" "}
-                      <button
-                        type="button"
-                        disabled={pendingId === m.id || m.status !== "active"}
-                        onClick={() => sendPasswordReset(m)}
-                        title={m.status !== "active" ? "Reactivate the account first" : undefined}
-                      >
-                        Send reset
-                      </button>
+                      <div className="button-group">
+                        <button type="button" disabled={pendingId === m.id} onClick={() => toggleStatus(m)}>
+                          {m.status === "suspended" ? "Reactivate" : "Suspend"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pendingId === m.id || m.status !== "active"}
+                          onClick={() => sendPasswordReset(m)}
+                          title={m.status !== "active" ? "Reactivate the account first" : undefined}
+                        >
+                          Send reset
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

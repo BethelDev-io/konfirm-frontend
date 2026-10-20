@@ -1,4 +1,5 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
@@ -63,7 +64,7 @@ export default function AdminNotificationsPage() {
 
       <div className="admin-section">
         {loading ? (
-          <div className="empty">Loading…</div>
+          <LoadingSpinner />
         ) : error ? (
           <div className="empty">Could not load notifications — try again.</div>
         ) : items.length === 0 ? (

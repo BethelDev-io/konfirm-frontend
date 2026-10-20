@@ -1,4 +1,5 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
@@ -84,7 +85,7 @@ export default function AdminOverviewPage() {
     })();
   }, []);
 
-  if (loading) return <div className="empty">Loading…</div>;
+  if (loading) return <LoadingSpinner />;
   if (!stats) return <div className="empty">Could not load stats.</div>;
 
   return (

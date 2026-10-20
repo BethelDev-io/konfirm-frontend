@@ -1,4 +1,5 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
@@ -47,7 +48,7 @@ export default function AdminUsersPage() {
       </p>
 
       {loading ? (
-        <div className="empty">Loading…</div>
+        <LoadingSpinner />
       ) : error ? (
         <div className="empty">Could not load users — try again.</div>
       ) : users.length === 0 ? (
