@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_BASE } from "@/lib/api";
 
 type RiskTier = "unverified" | "standard" | "established" | "enterprise";
 
@@ -81,6 +81,33 @@ export default function AdminMerchantsPage() {
     } catch (err) {
       reportError(err, { action: "admin.merchant.password_reset", merchantId: merchant.id });
       setError(err instanceof Error ? err.message : "Could not send the reset email.");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  async function viewAsMerchant(merchant: Merchant) {
+    if (
+      !window.confirm(
+        `Open a read-only admin preview of ${merchant.name}'s dashboard?\n\nThis will be logged in the admin activity log.`,
+      )
+    )
+      return;
+    setPendingId(merchant.id);
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/admin/merchants/${merchant.id}/preview-token`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || "Could not create a preview token.");
+      }
+      const { token } = await res.json();
+      window.open(`/activity?admin_preview=${token}`, "_blank", "noopener");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not open the merchant preview.");
     } finally {
       setPendingId(null);
     }
@@ -213,6 +240,14 @@ export default function AdminMerchantsPage() {
                         title={m.status !== "active" ? "Reactivate the account first" : undefined}
                       >
                         Send reset
+                      </button>{" "}
+                      <button
+                        type="button"
+                        disabled={pendingId === m.id || m.status !== "active"}
+                        onClick={() => viewAsMerchant(m)}
+                        title={m.status !== "active" ? "Reactivate the account first" : undefined}
+                      >
+                        View as
                       </button>
                     </td>
                   </tr>
