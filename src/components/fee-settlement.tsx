@@ -84,7 +84,9 @@ export default function FeeSettlement({ address }: { address: string }) {
       if (!submitted.ok) throw Object.assign(new Error(describeFailure(result)), { handled: true });
 
       setStatus({ text: "Fees settled. Thank you.", error: false });
-      await load();
+      await load().catch((refreshErr) => {
+        console.warn("[konfirm fees] totals refresh failed after successful settlement", refreshErr);
+      });
     } catch (err) {
       reportError(err, { tags: { area: "fee-settlement", action: "settle" } });
       setStatus({

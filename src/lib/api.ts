@@ -44,7 +44,13 @@ export async function apiFetch<T = unknown>(path: string, init: RequestInit = {}
   const isJsonBody = typeof body === "string" || (body !== undefined && !(body instanceof FormData));
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: credentials ?? "include",
-    headers: isJsonBody ? { "Content-Type": "application/json", ...headers } : headers,
+    headers: isJsonBody
+      ? (() => {
+          const h = new Headers(headers as HeadersInit | undefined);
+          if (!h.has("Content-Type")) h.set("Content-Type", "application/json");
+          return h;
+        })()
+      : headers,
     body,
     ...rest,
   });
