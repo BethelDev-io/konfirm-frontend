@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch, API_BASE } from "@/lib/api";
+import { apiFetch, apiPost, API_BASE } from "@/lib/api";
 
 type RiskTier = "unverified" | "standard" | "established" | "enterprise";
 
@@ -56,6 +56,28 @@ export default function AdminMerchantsPage() {
     })();
   }, []);
 
+  async function previewAsMerchant(merchant: Merchant) {
+    if (
+      !window.confirm(
+        `Open a read-only admin preview of ${merchant.name}'s dashboard?\n\nThis generates a short-lived preview token and opens the merchant view in a new tab, clearly bannered as an admin preview. The action is logged.`,
+      )
+    )
+      return;
+    setPendingId(merchant.id);
+    setError("");
+    try {
+      const result = await apiPost<{ preview_url: string }>(`/admin/merchants/${merchant.id}/preview-token`);
+      if (!result.ok || !result.data?.preview_url) {
+        throw new Error(result.ok ? "No preview URL returned." : result.message);
+      }
+      window.open(result.data.preview_url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not open a preview for this merchant.");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
   async function sendPasswordReset(merchant: Merchant) {
     if (!window.confirm(`Email a password-reset link to ${merchant.email}?`)) return;
     const reason = window.prompt("Why? Required, shown in the activity log:", "");
@@ -81,33 +103,6 @@ export default function AdminMerchantsPage() {
     } catch (err) {
       reportError(err, { action: "admin.merchant.password_reset", merchantId: merchant.id });
       setError(err instanceof Error ? err.message : "Could not send the reset email.");
-    } finally {
-      setPendingId(null);
-    }
-  }
-
-  async function viewAsMerchant(merchant: Merchant) {
-    if (
-      !window.confirm(
-        `Open a read-only admin preview of ${merchant.name}'s dashboard?\n\nThis will be logged in the admin activity log.`,
-      )
-    )
-      return;
-    setPendingId(merchant.id);
-    setError("");
-    try {
-      const res = await fetch(`${API_BASE}/admin/merchants/${merchant.id}/preview-token`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || "Could not create a preview token.");
-      }
-      const { token } = await res.json();
-      window.open(`/activity?admin_preview=${token}`, "_blank", "noopener");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not open the merchant preview.");
     } finally {
       setPendingId(null);
     }
@@ -243,11 +238,11 @@ export default function AdminMerchantsPage() {
                       </button>{" "}
                       <button
                         type="button"
-                        disabled={pendingId === m.id || m.status !== "active"}
-                        onClick={() => viewAsMerchant(m)}
-                        title={m.status !== "active" ? "Reactivate the account first" : undefined}
+                        disabled={pendingId === m.id}
+                        onClick={() => previewAsMerchant(m)}
+                        title="Open a read-only admin preview of this merchant's dashboard"
                       >
-                        View as
+                        Preview
                       </button>
                     </td>
                   </tr>

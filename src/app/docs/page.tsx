@@ -1,143 +1,145 @@
-"use client";
-
-import Link from "next/link";
+// Static developer documentation page for technically-inclined merchants.
+// Covers the link/payment/checkout data model and points toward the forthcoming
+// merchant API-key flow once it exists. No auth required — read-only, public.
 
 export default function DocsPage() {
   return (
-    <div style={{ maxWidth: 720, margin: "48px auto", padding: "0 24px", lineHeight: 1.65 }}>
-      <div style={{ marginBottom: 32 }}>
-        <Link href="/activity" style={{ fontSize: 13 }}>
-          ← Activity
-        </Link>
+    <div className="wrap" style={{ maxWidth: 760, margin: "0 auto", padding: "2rem 1.5rem" }}>
+      <div className="header-row">
+        <div className="brand">
+          <span className="mark">✓</span> Konfirm
+        </div>
       </div>
 
-      <h1 style={{ fontSize: 28, marginBottom: 8 }}>Developer Docs</h1>
-      <p className="hint" style={{ marginBottom: 40 }}>
-        Everything you need to integrate Konfirm into your own stack — the data model, how payment links work, and what
-        to expect on-chain.
+      <h1>Developer docs</h1>
+      <p className="sub">
+        Everything you need to understand what Konfirm does programmatically — the data model, the checkout flow, and
+        how payment links map to on-chain transactions.
       </p>
 
-      <section style={{ marginBottom: 40 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 12 }}>How payments work</h2>
+      <section style={{ marginTop: "2rem" }}>
+        <h2>Overview</h2>
         <p>
-          Every Konfirm payment flows over the Stellar network in USDC (or another supported asset). When a payer
-          completes a checkout, the transaction is submitted to Stellar and immediately confirmed on-chain — Konfirm
-          never holds funds in custody. You see the payment in your activity feed the moment the ledger closes,
-          typically within 5 seconds.
-        </p>
-        <p style={{ marginTop: 12 }}>
-          Payments are immutable once confirmed. If you need to return funds, initiate a separate payout from your
-          Stellar wallet — there is no server-side refund API at this time.
+          Konfirm is a Stellar-based payment confirmation layer. When a payer sends stablecoins (USDC by default) to
+          your Stellar address, Konfirm watches the ledger and confirms the payment on-chain in real time — no polling,
+          no webhooks to configure, no off-chain settlement risk.
         </p>
       </section>
 
-      <section style={{ marginBottom: 40 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 12 }}>Payment links</h2>
+      <section style={{ marginTop: "2rem" }}>
+        <h2>Data model</h2>
+
+        <h3 style={{ marginTop: "1.25rem" }}>Payment link</h3>
         <p>
-          A <strong>payment link</strong> is a URL of the form{" "}
-          <code className="mono" style={{ fontSize: 13 }}>
-            /pay/&lt;link-id&gt;
-          </code>{" "}
-          that displays a checkout page pre-loaded with your amount and description. Links can be:
+          A payment link (<code>/links</code>) is a shareable URL that pre-fills a checkout with a fixed or open
+          amount, a description, and your Stellar address. Each link has a unique <code>linkId</code> that routes the
+          payer to <code>/pay/:linkId</code>.
         </p>
-        <ul style={{ marginTop: 10, paddingLeft: 20 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "0.75rem", fontSize: "0.875rem" }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid var(--border, #e5e7eb)" }}>
+              <th style={{ textAlign: "left", padding: "0.5rem 0.75rem" }}>Field</th>
+              <th style={{ textAlign: "left", padding: "0.5rem 0.75rem" }}>Type</th>
+              <th style={{ textAlign: "left", padding: "0.5rem 0.75rem" }}>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              ["id", "UUID", "Unique link identifier"],
+              ["description", "string | null", "Human-readable label shown to the payer"],
+              ["amount_usdc", "decimal | null", "Fixed amount in USDC; null means open-amount"],
+              ["asset_code", "string", "Asset expected (default: USDC)"],
+              ["status", '"active" | "inactive"', "Whether the link accepts new payments"],
+              ["created_at", "ISO 8601", "Creation timestamp (UTC)"],
+            ].map(([field, type, desc]) => (
+              <tr key={field as string} style={{ borderBottom: "1px solid var(--border, #e5e7eb)" }}>
+                <td style={{ padding: "0.5rem 0.75rem" }}>
+                  <code>{field}</code>
+                </td>
+                <td style={{ padding: "0.5rem 0.75rem", color: "var(--text-lo, #6b7280)" }}>{type}</td>
+                <td style={{ padding: "0.5rem 0.75rem" }}>{desc}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <h3 style={{ marginTop: "1.5rem" }}>Payment</h3>
+        <p>
+          Each on-chain transaction that Konfirm matches to a payment link becomes a payment record. Payments are
+          immutable once confirmed — status changes (holds, refunds, disputes) are tracked separately.
+        </p>
+        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "0.75rem", fontSize: "0.875rem" }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid var(--border, #e5e7eb)" }}>
+              <th style={{ textAlign: "left", padding: "0.5rem 0.75rem" }}>Field</th>
+              <th style={{ textAlign: "left", padding: "0.5rem 0.75rem" }}>Type</th>
+              <th style={{ textAlign: "left", padding: "0.5rem 0.75rem" }}>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              ["id", "UUID", "Unique payment identifier"],
+              ["net_usdc", "decimal", "Amount received after fees"],
+              ["asset_code", "string", "Asset in which payment was made"],
+              ["payer_address", "string", "Stellar address of the payer"],
+              ["link_description", "string | null", "Description from the originating link"],
+              ["status", '"paid" | "held" | "refunded" | "disputed"', "Current payment status"],
+              ["fee_status", '"none" | "collected" | "owed" | "claimed" | "settled"', "Platform fee lifecycle"],
+              ["fee_owed_raw", "decimal | null", "Platform fee amount if owed"],
+              ["fee_asset_code", "string | null", "Asset in which the fee is owed"],
+            ].map(([field, type, desc]) => (
+              <tr key={field as string} style={{ borderBottom: "1px solid var(--border, #e5e7eb)" }}>
+                <td style={{ padding: "0.5rem 0.75rem" }}>
+                  <code>{field}</code>
+                </td>
+                <td style={{ padding: "0.5rem 0.75rem", color: "var(--text-lo, #6b7280)" }}>{type}</td>
+                <td style={{ padding: "0.5rem 0.75rem" }}>{desc}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section style={{ marginTop: "2rem" }}>
+        <h2>Checkout flow</h2>
+        <ol style={{ lineHeight: 1.8 }}>
           <li>
-            <strong>Fixed-amount</strong> — the payer sees a fixed USDC total and cannot change it.
+            Merchant creates a payment link at <code>/new</code> (fixed or open amount, optional description).
           </li>
           <li>
-            <strong>Open-amount</strong> — the payer enters any amount; held for admin review before settlement.
+            Merchant shares the link URL (<code>/pay/:linkId</code>) with a payer.
           </li>
+          <li>Payer opens the link, sees the amount and description, and sends USDC to the displayed Stellar address.</li>
           <li>
-            <strong>Single-use or reusable</strong> — a single-use link deactivates after the first successful payment.
+            Konfirm watches the Stellar ledger in real time. When the transaction lands and matches the link, it is
+            confirmed and appears in the merchant&apos;s <code>/activity</code> dashboard immediately.
           </li>
-        </ul>
-        <p style={{ marginTop: 12 }}>
-          Create and manage links from the{" "}
-          <Link href="/links">My links</Link> page, or programmatically once the merchant API-key feature ships (see
-          below).
-        </p>
+          <li>Merchant can cash out their balance at any time via <code>/cashout</code>.</li>
+        </ol>
       </section>
 
-      <section style={{ marginBottom: 40 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 12 }}>Data model</h2>
-        <p>The core objects you will encounter in API responses:</p>
-        <div
-          className="admin-table-wrap"
-          style={{ marginTop: 16 }}
-        >
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Object</th>
-                <th>Key fields</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="mono">Payment</td>
-                <td>
-                  <code className="mono">id</code>, <code className="mono">net_usdc</code>,{" "}
-                  <code className="mono">asset_code</code>, <code className="mono">payer_address</code>,{" "}
-                  <code className="mono">status</code> (<code className="mono">paid</code> |{" "}
-                  <code className="mono">held</code> | <code className="mono">refunded</code> |{" "}
-                  <code className="mono">disputed</code>), <code className="mono">created_at</code>
-                </td>
-              </tr>
-              <tr>
-                <td className="mono">PaymentLink</td>
-                <td>
-                  <code className="mono">id</code>, <code className="mono">description</code>,{" "}
-                  <code className="mono">amount_usdc</code> (null = open-amount),{" "}
-                  <code className="mono">active</code>, <code className="mono">single_use</code>
-                </td>
-              </tr>
-              <tr>
-                <td className="mono">Merchant</td>
-                <td>
-                  <code className="mono">name</code>, <code className="mono">email</code>,{" "}
-                  <code className="mono">stellar_base_address</code>, <code className="mono">status</code>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section style={{ marginBottom: 40 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 12 }}>Fees</h2>
+      <section style={{ marginTop: "2rem" }}>
+        <h2>Referrals</h2>
         <p>
-          Konfirm deducts a small platform fee from each settled payment. The fee is denominated in the same asset as
-          the payment and accrues as <code className="mono">fee_owed_raw</code> on each payment record. Settlement
-          happens periodically; you can see outstanding and settled fees on your activity page via the fee-settlement
-          widget.
-        </p>
-        <p style={{ marginTop: 12 }}>
-          Merchants who referred other merchants to Konfirm may be eligible for a promotional fee rate — check your{" "}
-          <Link href="/referrals">Referrals</Link> page for details.
+          Every merchant account includes a referral code, generated automatically at signup. Referred merchants are
+          tracked under your account — see your <a href="/referrals">Referrals page</a> for your code, promo status,
+          and the list of merchants you&apos;ve referred.
         </p>
       </section>
 
-      <section style={{ marginBottom: 40 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 12 }}>Programmatic access (coming soon)</h2>
+      <section style={{ marginTop: "2rem" }}>
+        <h2>Merchant API (coming soon)</h2>
         <p>
-          A merchant API-key feature is in development and will allow you to create payment links, query payments, and
-          receive webhook events from your own backend — without going through the browser UI. This page will be updated
-          with endpoint references and code examples once it ships.
-        </p>
-        <p style={{ marginTop: 12 }}>
-          In the meantime, if you have integration questions reach out to support. Network calls from the browser
-          console (all requests go to the same REST API) can serve as a guide to what is available today.
+          A programmatic merchant API — including API key management, webhook delivery, and direct link/payment
+          endpoints — is under development. This documentation will be updated when the API-key flow ships. If you need
+          early access or want to give input on the API design, contact{" "}
+          <a href="mailto:support@konfirm.xyz">support@konfirm.xyz</a>.
         </p>
       </section>
 
-      <section style={{ marginBottom: 40 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 12 }}>On-chain details</h2>
-        <p>
-          Konfirm uses the Stellar network. Payments are settled in USDC issued by Circle on Stellar (asset code{" "}
-          <code className="mono">USDC</code>, issuer{" "}
-          <code className="mono">GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN</code>). Your merchant
-          receiving address (<code className="mono">stellar_base_address</code>) must have a trustline to this asset
-          before payments can settle.
+      <section style={{ marginTop: "2rem", paddingTop: "1.5rem", borderTop: "1px solid var(--border, #e5e7eb)" }}>
+        <p style={{ fontSize: "0.875rem", color: "var(--text-lo, #6b7280)" }}>
+          Questions? Email <a href="mailto:support@konfirm.xyz">support@konfirm.xyz</a>.
         </p>
       </section>
     </div>
