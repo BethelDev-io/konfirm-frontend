@@ -39,8 +39,12 @@ interface Merchant {
   stellar_base_address: string | null;
 }
 
+// net_usdc is always a USD-equivalent value from the reconciler — for
+// non-USDC payments it is FX-converted, not the native amount paid (#127).
+// Render it as a USD figure with the originating asset noted, never as a
+// native-currency amount.
 function formatAmount(amount: number, code: string): string {
-  return code === "USDC" ? `$${amount.toFixed(2)}` : `${amount.toFixed(2)} ${code}`;
+  return code === "USDC" ? `$${amount.toFixed(2)}` : `$${amount.toFixed(2)} (paid in ${code})`;
 }
 
 // The dashboard is only ever the logged-in merchant's own data. There's no
@@ -53,6 +57,21 @@ function ActivityContent() {
     loginPath: "/login",
     select: (body) => (body as { merchant: Merchant }).merchant,
   });
+  // Gate render on auth resolution — prevents a false "$0.00 received"
+  // from flashing before the first fetch completes (#135).
+  if (!resolved) {
+    return (
+      <div className="wrap">
+        <div className="header-row">
+          <div className="brand">
+            <span className="mark">✓</span> Konfirm
+          </div>
+        </div>
+        <div className="empty">Loading…</div>
+      </div>
+    );
+  }
+
   const hasAddress = Boolean(merchant?.stellar_base_address);
   const showNav = Boolean(merchant);
   const [payments, setPayments] = useState<Payment[]>([]);
