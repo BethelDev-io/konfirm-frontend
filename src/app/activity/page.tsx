@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { API_BASE, apiPost } from "@/lib/api";
 import { useRequireAuth } from "@/lib/useAuth";
@@ -52,6 +52,8 @@ function formatAmount(amount: number, code: string): string {
 // so an unauthenticated visitor sees nothing.
 function ActivityContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isAdminPreview = Boolean(searchParams.get("admin_preview"));
   const { resolved, data: merchant } = useRequireAuth<Merchant>({
     meEndpoint: "/auth/me",
     loginPath: "/login",
@@ -127,6 +129,26 @@ function ActivityContent() {
 
   return (
     <div className="wrap">
+      {isAdminPreview && (
+        <div
+          role="banner"
+          style={{
+            background: "var(--warn, #b45309)",
+            color: "#fff",
+            padding: "10px 16px",
+            fontWeight: 600,
+            fontSize: 13,
+            borderRadius: 6,
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <span>⚠</span>
+          Admin preview — you are viewing this merchant&apos;s dashboard as an admin. This session is read-only and has been logged.
+        </div>
+      )}
       <div className="header-row">
         <div className="brand">
           <span className="mark">✓</span> Konfirm
@@ -136,6 +158,8 @@ function ActivityContent() {
             <Link href="/new">+ New payment</Link>
             <Link href="/links">My links</Link>
             <Link href="/cashout">Cash out</Link>
+            <Link href="/referrals">Referrals</Link>
+            <Link href="/docs">Docs</Link>
             <button type="button" onClick={handleLogout}>
               Log out
             </button>

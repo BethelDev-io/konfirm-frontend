@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiPost, API_BASE } from "@/lib/api";
 
 type RiskTier = "unverified" | "standard" | "established" | "enterprise";
 
@@ -55,6 +55,28 @@ export default function AdminMerchantsPage() {
       await load();
     })();
   }, []);
+
+  async function previewAsMerchant(merchant: Merchant) {
+    if (
+      !window.confirm(
+        `Open a read-only admin preview of ${merchant.name}'s dashboard?\n\nThis generates a short-lived preview token and opens the merchant view in a new tab, clearly bannered as an admin preview. The action is logged.`,
+      )
+    )
+      return;
+    setPendingId(merchant.id);
+    setError("");
+    try {
+      const result = await apiPost<{ preview_url: string }>(`/admin/merchants/${merchant.id}/preview-token`);
+      if (!result.ok || !result.data?.preview_url) {
+        throw new Error(result.ok ? "No preview URL returned." : result.message);
+      }
+      window.open(result.data.preview_url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not open a preview for this merchant.");
+    } finally {
+      setPendingId(null);
+    }
+  }
 
   async function sendPasswordReset(merchant: Merchant) {
     if (!window.confirm(`Email a password-reset link to ${merchant.email}?`)) return;
@@ -213,6 +235,14 @@ export default function AdminMerchantsPage() {
                         title={m.status !== "active" ? "Reactivate the account first" : undefined}
                       >
                         Send reset
+                      </button>{" "}
+                      <button
+                        type="button"
+                        disabled={pendingId === m.id}
+                        onClick={() => previewAsMerchant(m)}
+                        title="Open a read-only admin preview of this merchant's dashboard"
+                      >
+                        Preview
                       </button>
                     </td>
                   </tr>
