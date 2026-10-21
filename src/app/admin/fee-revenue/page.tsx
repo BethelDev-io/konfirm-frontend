@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { API_BASE } from "@/lib/api";
+import { formatAmount } from "@/lib/format";
 
 interface Summary {
   payment_count: number;
@@ -13,12 +14,21 @@ interface DailyRow {
   fee_usdc: string;
 }
 
-function formatUsdc(amount: string): string {
-  return `$${Number(amount).toFixed(2)}`;
+function formatDay(iso: string): string {
+  return `${new Date(iso).toLocaleDateString(undefined, { timeZone: "UTC" })} UTC`;
 }
 
-function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString();
+// Client-side CSV export from the already-loaded daily rows (#20).
+function downloadCsv(rows: DailyRow[]) {
+  const header = "Day (UTC),Payments,Fee Revenue (USD)";
+  const lines = rows.map((r) => `${r.day},${r.payment_count},${Number(r.fee_usdc).toFixed(2)}`);
+  const blob = new Blob([[header, ...lines].join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "fee-revenue.csv";
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 async function fetchFromBackend<T>(path: string, cookieHeader: string): Promise<T | null> {
@@ -51,7 +61,14 @@ export default async function AdminFeeRevenuePage() {
 
   return (
     <div>
-      <h1>Fee Revenue</h1>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <h1>Fee Revenue</h1>
+        {!loading && daily.length > 0 && (
+          <button type="button" onClick={() => downloadCsv(daily)}>
+            Download CSV
+          </button>
+        )}
+      </div>
       <p className="hint">
         Realized fee revenue only counts payments that actually settled (status = paid) — a refunded or disputed
         payment&apos;s fee was never really earned, so it&apos;s excluded here.

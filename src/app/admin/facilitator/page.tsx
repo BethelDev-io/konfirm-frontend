@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, apiPost } from "@/lib/api";
+import { formatAmount } from "@/lib/format";
 
 interface FacilitatorStatus {
   halted: boolean;
@@ -9,10 +10,7 @@ interface FacilitatorStatus {
   haltReason: string | null;
   spentTodayUsdc: number;
   capUsdc: number;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
+  capConfigured?: boolean;
 }
 
 export default function AdminFacilitatorPage() {
@@ -67,9 +65,15 @@ export default function AdminFacilitatorPage() {
 
       {error && <div className="status error">{error}</div>}
 
+      {!status.halted && (status.capConfigured === false || (status.capConfigured === undefined && status.capUsdc === 0)) && (
+        <div className="status error" style={{ marginBottom: 20 }}>
+          Daily spend cap not configured — the facilitator will halt on its next signing attempt.
+        </div>
+      )}
+
       {status.halted && (
         <div className="status error" style={{ marginBottom: 20 }}>
-          Halted{status.haltedAt ? ` since ${formatDate(status.haltedAt)}` : ""}
+          Halted{status.haltedAt ? ` since ${formatUtcTimestamp(status.haltedAt)}` : ""}
           {status.haltReason ? ` — ${status.haltReason}` : ""}
         </div>
       )}
@@ -82,11 +86,11 @@ export default function AdminFacilitatorPage() {
           </div>
           <div className="stat-card">
             <div className="stat-label">Spent today</div>
-            <div className="stat-value">${status.spentTodayUsdc.toFixed(2)}</div>
+            <div className="stat-value">{formatAmount(status.spentTodayUsdc, "USDC")}</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Daily cap</div>
-            <div className="stat-value">${status.capUsdc.toFixed(2)}</div>
+            <div className="stat-value">{formatAmount(status.capUsdc, "USDC")}</div>
           </div>
         </div>
       </div>

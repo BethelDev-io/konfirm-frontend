@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --ink: #0a0908;
   --surface: #17140f;
   --surface-2: #1e1a14;
@@ -25,9 +26,14 @@ body {
 
 body {
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--ink);
   color: var(--text-hi);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 /* Centered single-card pages (login, signup, new, pay, cashout, get-test-usdc) */
@@ -36,6 +42,7 @@ body {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 24px;
 }
 
@@ -121,6 +128,11 @@ label {
 .footer a {
   color: var(--accent);
   text-decoration: none;
+  display: inline-block;
+  min-height: 24px;
+  min-width: 24px;
+  padding: 4px 2px;
+  line-height: 16px;
 }
 .footer a:hover {
   text-decoration: underline;
@@ -259,6 +271,24 @@ button.secondary {
   font-size: 12.5px;
   color: var(--text-faint);
   margin-bottom: 24px;
+}
+
+/* Forced colors (e.g. Windows High Contrast) strip custom backgrounds, so
+   anything that only communicated state via `background: var(--accent)`
+   — the primary button and the active currency toggle — can disappear
+   into the surrounding surface. Give them an explicit border and rely on
+   system colors so the shapes and active state stay visible. */
+@media (forced-colors: active) {
+  button.primary {
+    border: 2px solid ButtonText;
+  }
+  .ctoggle {
+    border: 1px solid ButtonText;
+  }
+  .ctoggle.active {
+    border: 2px solid Highlight;
+    outline: 1px solid Highlight;
+  }
 }
 
 /* Amount hero (new) */
@@ -660,6 +690,7 @@ a.txlink {
 .admin-shell {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 .admin-sidebar {
   width: 220px;
@@ -732,6 +763,7 @@ a.txlink {
 }
 .admin-main {
   flex: 1;
+  min-width: 0;
   max-width: 960px;
   padding: 40px 44px;
 }
@@ -1005,4 +1037,46 @@ a.txlink {
 .admin-status-row .mono {
   font-size: 14px;
   color: var(--text-hi);
+}
+
+/* Admin: narrow viewports — stack the sidebar above content and drop the
+   stat-grid column floor so nothing forces page-wide horizontal scroll. */
+@media (max-width: 768px) {
+  .admin-shell {
+    flex-direction: column;
+  }
+  .admin-sidebar {
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+  }
+  .admin-sidebar .brand {
+    margin-bottom: 16px;
+  }
+  .admin-sidebar-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .admin-sidebar-group {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+  }
+  .admin-sidebar-group-label {
+    display: none;
+  }
+  .admin-sidebar-footer {
+    margin-top: 12px;
+  }
+  .admin-main {
+    max-width: none;
+    padding: 20px;
+  }
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
 }
