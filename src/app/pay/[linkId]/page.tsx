@@ -5,6 +5,7 @@ import freighterApi from "@stellar/freighter-api";
 import { TransactionBuilder, Networks } from "@stellar/stellar-sdk";
 import qrcode from "qrcode-generator";
 import { API_BASE } from "@/lib/api";
+import { formatAmount } from "@/lib/format";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 
@@ -42,7 +43,9 @@ function friendlyMessage(err: unknown): string {
     "this address is not permitted to pay",
     "pay-what-you-want links need an amount",
   ];
-  if (knownSafe.some((s) => msg.toLowerCase().includes(s))) return msg;
+  if (knownSafe.some((s) => msg.toLowerCase().includes(s))) {
+    return "This payment link isn't available right now. Please contact the merchant.";
+  }
   if (msg.toLowerCase().includes("declined") || msg.toLowerCase().includes("rejected")) {
     return "You'll need to approve the payment in your wallet to continue.";
   }
@@ -118,9 +121,16 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
   const [statusIsError, setStatusIsError] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [confirmed, setConfirmed] = useState<ConfirmedPayment | null>(null);
+  const [linkInactive, setLinkInactive] = useState(false);
 
   const alreadyConfirmed = useRef(false);
   const sharedMuxedId = useRef<string | null>(null);
+  const broadcastRef = useRef<BroadcastChannel | null>(null);
+  // True only while a payment is being signed/submitted/confirmed, so the
+  // beforeunload prompt never fires during passive polling or idle states.
+  const operationInFlight = useRef(false);
+  useBeforeUnload(operationInFlight);
+  const connectInFlight = useRef(false);
 
   function setStatusMsg(msg: string, isError = false) {
     setStatus(msg);
@@ -131,6 +141,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
     if (alreadyConfirmed.current) return; // either path can win; only act on the first
     alreadyConfirmed.current = true;
     setConfirmed(payment);
+    broadcastRef.current?.postMessage({ type: "confirmed" });
   }
 
   // Asks only about this payer's own session, so a checkout page never
@@ -143,10 +154,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
     intervalMs: number,
   ): Promise<ConfirmedPayment | null> {
     for (let i = 0; i < attempts; i++) {
-      if (alreadyConfirmed.current) return null;
+      if (alreadyConfirmed.current || cancelledRef.current) return null;
       const res = await fetch(`${API_BASE}/links/${pollLinkId}/sessions/${muxedId}`);
+      if (cancelledRef.current) return null;
       if (res.ok) {
         const body: { confirmed: boolean; payment: { tx_hash: string } | null } = await res.json();
+        if (cancelledRef.current) return null;
         if (body.confirmed && body.payment) return { tx_hash: body.payment.tx_hash, muxed_id: muxedId };
       }
       await new Promise((r) => setTimeout(r, intervalMs));
@@ -188,18 +201,24 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
       const qr = qrcode(0, "M");
       qr.addData(body.uri);
       qr.make();
+      if (cancelledRef.current) return;
       setQrSvg(qr.createSvgTag(5, 8));
       setQrUri(body.uri);
     } catch (err) {
-      console.error("[konfirm checkout] QR setup failed", err);
+      reportError(err, { tags: { flow: "checkout", stage: "qr-setup", linkId } });
       setShowQr(false);
     }
   }
 
   async function handleConnect() {
+    if (connectInFlight.current) return;
+    connectInFlight.current = true;
     setConnecting(true);
+    operationInFlight.current = true;
+    broadcastRef.current?.postMessage({ type: "paying" });
     try {
       setStatusMsg(STAGE.CONNECT);
+      const { default: freighterApi } = await import("@stellar/freighter-api");
       const access = await freighterApi.requestAccess();
       if (access.error) throw new Error(access.error);
       const payerAddress = access.address;
