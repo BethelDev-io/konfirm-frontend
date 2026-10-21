@@ -1,7 +1,8 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { API_BASE } from "@/lib/api";
-import { formatAmount } from "@/lib/format";
+"use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
+
+import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 
 interface Summary {
   payment_count: number;
@@ -74,15 +75,21 @@ export default async function AdminFeeRevenuePage() {
         payment&apos;s fee was never really earned, so it&apos;s excluded here.
       </p>
 
-      <div className="admin-section">
-        <div className="stat-grid">
-          <div className="stat-card">
-            <div className="stat-label">Total fee revenue</div>
-            <div className="stat-value">{summary ? formatUsdc(summary.total_fee_usdc) : "—"}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Paid transactions</div>
-            <div className="stat-value">{summary?.payment_count ?? "—"}</div>
+      {loading ? (
+        <LoadingSpinner stallThreshold={3000} />
+      ) : (
+        <>
+          <div className="admin-section">
+            <div className="stat-grid">
+              <div className="stat-card">
+                <div className="stat-label">Total fee revenue</div>
+                <div className="stat-value">{summary ? formatUsdc(summary.total_fee_usdc) : "—"}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">Paid transactions</div>
+                <div className="stat-value">{summary?.payment_count ?? "—"}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

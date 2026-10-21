@@ -1,4 +1,5 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useEffect, useRef, useState } from "react";
 import { apiFetch, apiPatch } from "@/lib/api";
@@ -102,7 +103,7 @@ export default function AdminBazaarPage() {
 
       <div className="admin-section">
         {loading ? (
-          <div className="empty">Loading…</div>
+          <LoadingSpinner />
         ) : error ? (
           <div className="empty">Could not load listings — try again.</div>
         ) : listings.length === 0 ? (
@@ -141,14 +142,14 @@ export default function AdminBazaarPage() {
                     <td>{formatDate(l.created_at)}</td>
                     <td>
                       {l.status === "pending" && (
-                        <>
+                        <div className="button-group">
                           <button type="button" disabled={pendingId === l.id} onClick={() => handleReview(l, "approved")}>
                             Approve
-                          </button>{" "}
+                          </button>
                           <button type="button" disabled={pendingId === l.id} onClick={() => handleReview(l, "rejected")}>
                             Reject
                           </button>
-                        </>
+                        </div>
                       )}
                     </td>
                   </tr>

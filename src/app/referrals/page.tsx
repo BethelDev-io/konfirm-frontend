@@ -87,6 +87,11 @@ export default function ReferralsPage() {
 
   async function copyLink() {
     if (!referralUrl) return;
+    if (!navigator.clipboard?.writeText) {
+      setCopied(false);
+      setCopyError(true);
+      return;
+    }
     try {
       await navigator.clipboard.writeText(referralUrl);
       setCopyError(false);

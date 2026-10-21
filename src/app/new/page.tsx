@@ -168,6 +168,10 @@ export default function NewPaymentPage() {
   }
 
   async function handleCopy() {
+    if (!navigator.clipboard?.writeText) {
+      setStatus("Couldn't copy — select and copy the link manually.");
+      return;
+    }
     try {
       await navigator.clipboard.writeText(linkUrl);
       setStatus("");

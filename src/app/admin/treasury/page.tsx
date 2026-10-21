@@ -1,4 +1,5 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
@@ -34,7 +35,7 @@ export default function AdminTreasuryPage() {
     })();
   }, []);
 
-  if (loading) return <div className="empty">Loading…</div>;
+  if (loading) return <LoadingSpinner />;
   if (!status) return <div className="empty">Could not load treasury status.</div>;
 
   return (

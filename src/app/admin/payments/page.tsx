@@ -1,4 +1,5 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
@@ -154,7 +155,7 @@ export default function AdminPaymentsPage() {
 
       <div className="admin-section">
         {loading ? (
-          <div className="empty">Loading…</div>
+          <LoadingSpinner stallThreshold={3000} />
         ) : error && payments.length === 0 ? (
           <div className="empty">Could not load payments — try again.</div>
         ) : payments.length === 0 ? (

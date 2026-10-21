@@ -196,12 +196,16 @@ select:focus {
 button {
   width: 100%;
   padding: 14px;
+  min-height: 48px;
   border-radius: 999px;
   border: none;
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
   font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 button.primary {
@@ -893,11 +897,18 @@ a.txlink {
 .admin-table button {
   width: auto;
   padding: 6px 14px;
+  min-height: 44px;
   font-size: 12.5px;
   margin: 0;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-hi);
+}
+.admin-table td .button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 .admin-table button:hover {
   border-color: var(--accent);

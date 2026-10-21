@@ -1,4 +1,5 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
@@ -65,7 +66,7 @@ export default function AdminReferralsPage() {
       </p>
 
       {loading ? (
-        <div className="empty">Loading…</div>
+        <LoadingSpinner />
       ) : error ? (
         <div className="empty">Could not load referrals — try again.</div>
       ) : referrals.length === 0 ? (
