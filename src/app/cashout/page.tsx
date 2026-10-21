@@ -37,7 +37,7 @@ function friendlyMessage(err: unknown): string {
 }
 
 export default function CashoutPage() {
-  const { data: merchant } = useRequireAuth<Merchant>({
+  const { data: merchant, resolved } = useRequireAuth<Merchant>({
     meEndpoint: "/auth/me",
     loginPath: "/login",
     select: (body) => (body as { merchant: Merchant }).merchant,
@@ -239,6 +239,8 @@ export default function CashoutPage() {
     setStarting(false);
     setStatus("");
   }
+
+  if (!resolved) return null;
 
   return (
     <div className="page-center">
