@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { API_BASE } from "@/lib/api";
+import { formatAmount } from "@/lib/format";
 
 interface Stats {
   merchants: { total: number; active: number; suspended: number; pending: number };
@@ -26,9 +27,6 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
-function formatUsd(value: string): string {
-  return `$${Number(value).toFixed(2)}`;
-}
 
 function dayLabel(dateStr: string): string {
   return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "short" });
@@ -108,7 +106,7 @@ export default function AdminOverviewPage() {
           <div className="stat-card">
             <div className="stat-label">Payments today</div>
             <div className="stat-value">{stats.payments.today_count}</div>
-            <div className="stat-sub">{formatUsd(stats.payments.today_net_usdc)} net</div>
+            <div className="stat-sub">{formatAmount(stats.payments.today_net_usdc, "USDC")} net</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Blocked addresses</div>
@@ -129,7 +127,7 @@ export default function AdminOverviewPage() {
       </div>
 
       <div className="admin-section">
-        <h2>Payment volume, last 7 days ({formatUsd(stats.payments.last_7d_net_usdc)} total)</h2>
+        <h2>Payment volume, last 7 days ({formatAmount(stats.payments.last_7d_net_usdc, "USDC")} total)</h2>
         <div className="chart-card">
           <VolumeChart points={stats.daily_volume} />
           <div className="chart-labels">

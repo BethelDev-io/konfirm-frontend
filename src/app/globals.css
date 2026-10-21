@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --ink: #0a0908;
   --surface: #17140f;
   --surface-2: #1e1a14;
@@ -750,6 +751,7 @@ a.txlink {
 }
 .admin-main {
   flex: 1;
+  min-width: 0;
   max-width: 960px;
   padding: 40px 44px;
 }
@@ -1025,24 +1027,44 @@ a.txlink {
   color: var(--text-hi);
 }
 
-/* Fallback spacing for flex gap on Safari < 14.1 / old WKWebView */
-@supports not (gap: 1px) {
-  .chips > * + * {
-    margin-left: 8px;
+/* Admin: narrow viewports — stack the sidebar above content and drop the
+   stat-grid column floor so nothing forces page-wide horizontal scroll. */
+@media (max-width: 768px) {
+  .admin-shell {
+    flex-direction: column;
   }
-  .nav > * + * {
-    margin-left: 14px;
+  .admin-sidebar {
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
   }
-  .payment {
-    margin-bottom: 10px;
+  .admin-sidebar .brand {
+    margin-bottom: 16px;
   }
-  .payment .left > * + * {
-    margin-left: 12px;
+  .admin-sidebar-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px;
   }
-  .admin-inline-form > * + * {
-    margin-left: 8px;
+  .admin-sidebar-group {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
   }
-  .filter-pills > * + * {
-    margin-left: 8px;
+  .admin-sidebar-group-label {
+    display: none;
+  }
+  .admin-sidebar-footer {
+    margin-top: 12px;
+  }
+  .admin-main {
+    max-width: none;
+    padding: 20px;
+  }
+  .stat-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatAmount } from "@/lib/format";
 import { useRequireAuth } from "@/lib/useAuth";
 
 interface Merchant {
@@ -52,7 +53,7 @@ function PromoBanner({ promo }: { promo: Promo }) {
       <div style={{ fontWeight: 600, marginBottom: 4 }}>{label} active{promo.expiresAt ? ` — ${formatDaysLeft(daysLeft(promo.expiresAt))}` : ""}</div>
       {promo.volumeCapUsdc && (
         <div className="hint">
-          ${Number(promo.volumeSoFarUsdc).toFixed(2)} of ${Number(promo.volumeCapUsdc).toFixed(2)} processed at this rate
+          {formatAmount(promo.volumeSoFarUsdc, "USDC")} of {formatAmount(promo.volumeCapUsdc, "USDC")} processed at this rate
         </div>
       )}
     </div>

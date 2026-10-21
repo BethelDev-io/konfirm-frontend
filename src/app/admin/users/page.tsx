@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { API_BASE } from "@/lib/api";
+import { formatAmount } from "@/lib/format";
 
 interface UserRow {
   payer_address: string;
@@ -13,8 +14,8 @@ interface UserRow {
   disputed_count: string;
 }
 
-function formatUsdc(amount: string): string {
-  return `$${Number(amount).toFixed(2)}`;
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleString();
 }
 
 function shortAddress(address: string): string {
@@ -71,7 +72,7 @@ export default function AdminUsersPage() {
                   <tr key={u.payer_address}>
                     <td className="mono">{shortAddress(u.payer_address)}</td>
                     <td className="mono">{u.payment_count}</td>
-                    <td className="mono">{formatUsdc(u.total_volume_usdc)}</td>
+                    <td className="mono">{formatAmount(u.total_volume_usdc, "USDC")}</td>
                     <td className="mono">
                       {u.refunded_count} / {u.disputed_count}
                     </td>

@@ -5,8 +5,7 @@ import type { Metadata } from "next";
 import freighterApi from "@stellar/freighter-api";
 import qrcode from "qrcode-generator";
 import { API_BASE } from "@/lib/api";
-import { reportError } from "@/lib/report-error";
-import { useBeforeUnload } from "@/lib/use-before-unload";
+import { formatAmount } from "@/lib/format";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 
@@ -320,17 +319,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkId]);
 
-  function formatCurrency(value: string, currency: string): string {
-    const str = Number(value).toFixed(2);
-    return currency === "USDC" ? `$${str}` : `${str} ${currency}`;
-  }
-
-  const amountDisplay = linkData ? formatCurrency(linkData.amount_usdc, linkData.currency) : "";
+  const amountDisplay = linkData ? formatAmount(linkData.amount_usdc, linkData.currency) : "";
   const feeUsdc = linkData?.fee_usdc ? Number(linkData.fee_usdc) : 0;
-  const feeDisplay = linkData && feeUsdc > 0 ? formatCurrency(linkData.fee_usdc as string, linkData.currency) : "";
+  const feeDisplay = linkData && feeUsdc > 0 ? formatAmount(linkData.fee_usdc as string, linkData.currency) : "";
   const totalDisplay =
     linkData && feeUsdc > 0
-      ? formatCurrency((Number(linkData.amount_usdc) + feeUsdc).toString(), linkData.currency)
+      ? formatAmount((Number(linkData.amount_usdc) + feeUsdc).toString(), linkData.currency)
       : "";
 
   return (
