@@ -131,7 +131,7 @@ function SignupForm() {
               id="address"
               type="text"
               placeholder="G..."
-              spellCheck={false}
+              autoComplete="off"
               required
               value={address}
               onChange={(e) => setAddress(e.target.value)}
