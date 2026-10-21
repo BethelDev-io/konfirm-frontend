@@ -53,6 +53,7 @@ export default function CashoutPage() {
   const cancelled = useRef(false);
   const paymentSubmitted = useRef(false);
   const signingInFlight = useRef(false);
+  const inFlight = useRef(false);
   useBeforeUnload(signingInFlight);
 
   // Ref mutation (not React state) in response to an external value
@@ -85,6 +86,7 @@ export default function CashoutPage() {
   }
 
   function showFormError(msg: string) {
+    inFlight.current = false;
     setView("form");
     setStatus(msg);
     setStarting(false);
@@ -170,11 +172,8 @@ export default function CashoutPage() {
   }
 
   async function handleStart() {
-    // Never begin the wallet/signing flow without a Stellar address on file.
-    if (!merchant?.stellar_base_address || !merchantAddress.current) {
-      setStatus(missingAddressStatus || "Add a Stellar address to your account before cashing out.");
-      return;
-    }
+    if (inFlight.current) return;
+    inFlight.current = true;
     setStarting(true);
     paymentSubmitted.current = false;
     cancelled.current = false;
@@ -225,7 +224,8 @@ export default function CashoutPage() {
       if (!startRes.ok) throw new Error(startBody.message || "could not start a cash-out");
 
       signingInFlight.current = false;
-      window.open(startBody.url, "konfirm-cashout", "width=460,height=700,noopener,noreferrer");
+      inFlight.current = false;
+      window.open(startBody.url, "konfirm-cashout", "width=460,height=700");
       pollStatus(tokenBody.token, startBody.id);
     } catch (err) {
       if (cancelled.current) return;
@@ -235,6 +235,7 @@ export default function CashoutPage() {
   }
 
   function handleAnother() {
+    inFlight.current = false;
     setView("form");
     setStarting(false);
     setStatus("");

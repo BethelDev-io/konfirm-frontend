@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiPost } from "@/lib/api";
@@ -78,40 +78,10 @@ export default function NewPaymentPage() {
   const [copyLabel, setCopyLabel] = useState("Copy");
   const [copyAnnouncement, setCopyAnnouncement] = useState("");
   const [showResult, setShowResult] = useState(false);
-  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Restore draft from sessionStorage on mount
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(DRAFT_KEY);
-      if (raw) {
-        const draft = JSON.parse(raw) as { amount?: string; currency?: Currency; description?: string };
-        if (draft.amount) setAmount(draft.amount);
-        if (draft.currency && (["XLM", "USDC", "EURC"] as Currency[]).includes(draft.currency)) setCurrency(draft.currency);
-        if (draft.description) setDescription(draft.description);
-      }
-    } catch {
-      // sessionStorage unavailable or corrupt — start blank
-    }
-  }, []);
-
-  // Persist draft to sessionStorage on change, debounced
-  useEffect(() => {
-    if (showResult) return;
-    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
-    draftTimerRef.current = setTimeout(() => {
-      try {
-        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ amount, currency, description }));
-      } catch {
-        // sessionStorage unavailable — ignore
-      }
-    }, 300);
-    return () => {
-      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
-    };
-  }, [amount, currency, description, showResult]);
+  const inFlight = useRef(false);
 
   async function handleSubmit() {
+    if (inFlight.current) return;
     const amountRaw = amount.trim();
     setStatus("");
 
@@ -130,6 +100,7 @@ export default function NewPaymentPage() {
       return;
     }
 
+    inFlight.current = true;
     setSubmitting(true);
     try {
       const result = await apiPost<{ id: string }>("/links", {
@@ -163,6 +134,7 @@ export default function NewPaymentPage() {
       reportError(err, { tags: { area: "new-payment", action: "create-link" } });
       setStatus(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
+      inFlight.current = false;
       setSubmitting(false);
     }
   }

@@ -85,15 +85,15 @@ export default function AdminNotificationsPage() {
         <div className="stat-grid">
           <div className="stat-card">
             <div className="stat-label">Total</div>
-            <div className="stat-value">{items.length}</div>
+            <div className="stat-value">{error ? "—" : items.length}</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Critical</div>
-            <div className="stat-value stat-bad">{critical}</div>
+            <div className="stat-value stat-bad">{error ? "—" : critical}</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Warning</div>
-            <div className="stat-value">{warning}</div>
+            <div className="stat-value">{error ? "—" : warning}</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Unknown</div>

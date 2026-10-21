@@ -1,8 +1,8 @@
 "use client";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
-import { useEffect, useState } from "react";
-import { apiFetch, apiPost, API_BASE } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { apiFetch } from "@/lib/api";
 
 type RiskTier = "unverified" | "standard" | "established" | "enterprise";
 
@@ -33,6 +33,7 @@ export default function AdminMerchantsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const inFlight = useRef(false);
 
   const PAGE_SIZE = 50;
 
@@ -60,12 +61,14 @@ export default function AdminMerchantsPage() {
   }
 
   async function sendPasswordReset(merchant: Merchant) {
+    if (inFlight.current) return;
     if (!window.confirm(`Email a password-reset link to ${merchant.email}?`)) return;
     const reason = window.prompt("Why? Required, shown in the activity log:", "");
     if (!reason || reason.trim().length < 3) {
       setError("A reason of at least 3 characters is needed to send a reset.");
       return;
     }
+    inFlight.current = true;
     setPendingId(merchant.id);
     setError("");
     try {
@@ -85,11 +88,13 @@ export default function AdminMerchantsPage() {
       reportError(err, { action: "admin.merchant.password_reset", merchantId: merchant.id });
       setError(err instanceof Error ? err.message : "Could not send the reset email.");
     } finally {
+      inFlight.current = false;
       setPendingId(null);
     }
   }
 
   async function toggleStatus(merchant: Merchant) {
+    if (inFlight.current) return;
     const nextStatus = merchant.status === "suspended" ? "active" : "suspended";
     const verb = nextStatus === "suspended" ? "suspend" : "reactivate";
     const confirmMessage =
@@ -104,6 +109,7 @@ export default function AdminMerchantsPage() {
       if (reason === null) return;
     }
 
+    inFlight.current = true;
     setPendingId(merchant.id);
     setError("");
     try {
@@ -122,11 +128,13 @@ export default function AdminMerchantsPage() {
       reportError(err, { action: "admin.merchant.status_change", merchantId: merchant.id, status: nextStatus });
       setError(err instanceof Error ? err.message : `Could not ${verb} this merchant.`);
     } finally {
+      inFlight.current = false;
       setPendingId(null);
     }
   }
 
   async function changeTier(merchant: Merchant, riskTier: RiskTier) {
+    if (inFlight.current) return;
     if (riskTier === merchant.risk_tier) return;
     // This changes what tier a merchant is TREATED as, not their actual
     // verification status — there's no identity/KYC check behind this yet,
@@ -138,6 +146,7 @@ export default function AdminMerchantsPage() {
     )
       return;
 
+    inFlight.current = true;
     setPendingId(merchant.id);
     setError("");
     try {
@@ -156,6 +165,7 @@ export default function AdminMerchantsPage() {
       reportError(err, { action: "admin.merchant.tier_change", merchantId: merchant.id, riskTier });
       setError(err instanceof Error ? err.message : "Could not change this merchant's tier.");
     } finally {
+      inFlight.current = false;
       setPendingId(null);
     }
   }
