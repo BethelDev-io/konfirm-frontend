@@ -1,7 +1,9 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { explorerUrl } from "@/lib/stellar-explorer";
 
 interface TreasuryStatus {
   contract_id: string;
@@ -10,10 +12,11 @@ interface TreasuryStatus {
   usdc_balance: string | null;
   reachable: boolean;
   wired_into_checkout: boolean;
-}
-
-function explorerUrl(id: string): string {
-  return `https://stellar.expert/explorer/testnet/contract/${id}`;
+  // Optional: not yet returned by the backend. Once
+  // admin-treasury.service.ts includes it in the response, this page will
+  // automatically link to the correct network's explorer instead of
+  // falling back to testnet.
+  network?: string;
 }
 
 function shortAddress(address: string): string {
@@ -32,7 +35,7 @@ export default function AdminTreasuryPage() {
     })();
   }, []);
 
-  if (loading) return <div className="empty">Loading…</div>;
+  if (loading) return <LoadingSpinner />;
   if (!status) return <div className="empty">Could not load treasury status.</div>;
 
   return (
@@ -83,7 +86,7 @@ export default function AdminTreasuryPage() {
             <tbody>
               <tr>
                 <td className="mono">
-                  <a href={explorerUrl(status.contract_id)} target="_blank" rel="noreferrer">
+                  <a href={explorerUrl(status.contract_id, status.network)} target="_blank" rel="noreferrer">
                     {status.contract_id}
                   </a>
                 </td>
