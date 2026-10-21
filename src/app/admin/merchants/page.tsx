@@ -29,25 +29,22 @@ function shortAddress(address: string | null): string {
 export default function AdminMerchantsPage() {
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  async function load() {
-    setLoadError(false);
-    try {
-      const data = await apiFetch<Merchant[]>("/admin/merchants");
-      if (data === null) {
-        setLoadError(true);
-      } else {
-        setMerchants(data);
-      }
-    } catch (err) {
-      console.error("[konfirm admin] merchants load failed", err);
-      setLoadError(true);
-    } finally {
-      setLoading(false);
+  const PAGE_SIZE = 50;
+
+  async function load(offset = 0) {
+    const res = await fetch(`${API_BASE}/admin/merchants?limit=${PAGE_SIZE}&offset=${offset}`, {
+      credentials: "include",
+    });
+    if (res.ok) {
+      const page: Merchant[] = await res.json();
+      setMerchants((prev) => (offset === 0 ? page : [...prev, ...page]));
     }
+    setLoading(false);
+    setLoadingMore(false);
   }
 
   useEffect(() => {
@@ -56,26 +53,9 @@ export default function AdminMerchantsPage() {
     })();
   }, []);
 
-  async function previewAsMerchant(merchant: Merchant) {
-    if (
-      !window.confirm(
-        `Open a read-only admin preview of ${merchant.name}'s dashboard?\n\nThis generates a short-lived preview token and opens the merchant view in a new tab, clearly bannered as an admin preview. The action is logged.`,
-      )
-    )
-      return;
-    setPendingId(merchant.id);
-    setError("");
-    try {
-      const result = await apiPost<{ preview_url: string }>(`/admin/merchants/${merchant.id}/preview-token`);
-      if (!result.ok || !result.data?.preview_url) {
-        throw new Error(result.ok ? "No preview URL returned." : result.message);
-      }
-      window.open(result.data.preview_url, "_blank", "noopener,noreferrer");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not open a preview for this merchant.");
-    } finally {
-      setPendingId(null);
-    }
+  async function loadMore() {
+    setLoadingMore(true);
+    await load(merchants.length);
   }
 
   async function sendPasswordReset(merchant: Merchant) {
@@ -111,7 +91,11 @@ export default function AdminMerchantsPage() {
   async function toggleStatus(merchant: Merchant) {
     const nextStatus = merchant.status === "suspended" ? "active" : "suspended";
     const verb = nextStatus === "suspended" ? "suspend" : "reactivate";
-    if (!window.confirm(`${verb === "suspend" ? "Suspend" : "Reactivate"} ${merchant.name} (${merchant.email})?`)) return;
+    const confirmMessage =
+      nextStatus === "suspended"
+        ? `Suspend ${merchant.name} (${merchant.email})?\n\nWhile suspended, this merchant cannot sign in to the dashboard or receive new payments; their existing links stop accepting payments until they're reactivated.`
+        : `Reactivate ${merchant.name} (${merchant.email})?\n\nThis restores their ability to sign in and accept payments.`;
+    if (!window.confirm(confirmMessage)) return;
 
     let reason: string | null = "";
     if (verb === "suspend") {
@@ -211,6 +195,7 @@ export default function AdminMerchantsPage() {
                     </td>
                     <td>
                       <select
+                        aria-label="Risk tier"
                         value={m.risk_tier}
                         disabled={pendingId === m.id}
                         onChange={(e) => changeTier(m, e.target.value as RiskTier)}
@@ -249,6 +234,19 @@ export default function AdminMerchantsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {!loading && merchants.length > 0 && (
+          <div className="admin-pagination">
+            <span>
+              Showing {merchants.length} merchant{merchants.length === 1 ? "" : "s"}
+              {merchants.length % PAGE_SIZE === 0 ? " — there may be more" : ""}
+            </span>
+            {merchants.length % PAGE_SIZE === 0 && (
+              <button type="button" disabled={loadingMore} onClick={loadMore}>
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
+            )}
           </div>
         )}
         {error && <div className="status error">{error}</div>}

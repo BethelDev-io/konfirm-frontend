@@ -22,22 +22,41 @@ function shortAddress(address: string): string {
   return `${address.slice(0, 4)}…${address.slice(-4)}`;
 }
 
+const PAGE_SIZE = 50;
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const data = await apiFetch<UserRow[]>("/admin/users");
-      if (data) {
-        setUsers(data);
-      } else {
-        setError(true);
+      const res = await fetch(`${API_BASE}/admin/users?limit=${PAGE_SIZE}&offset=0`, { credentials: "include" });
+      if (res.ok) {
+        const rows: UserRow[] = await res.json();
+        setUsers(rows);
+        setHasMore(rows.length === PAGE_SIZE);
       }
       setLoading(false);
     })();
   }, []);
+
+  async function loadMore() {
+    setLoadingMore(true);
+    const nextOffset = offset + PAGE_SIZE;
+    const res = await fetch(`${API_BASE}/admin/users?limit=${PAGE_SIZE}&offset=${nextOffset}`, {
+      credentials: "include",
+    });
+    if (res.ok) {
+      const rows: UserRow[] = await res.json();
+      setUsers((prev) => [...prev, ...rows]);
+      setOffset(nextOffset);
+      setHasMore(rows.length === PAGE_SIZE);
+    }
+    setLoadingMore(false);
+  }
 
   return (
     <div>
@@ -82,6 +101,16 @@ export default function AdminUsersPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="admin-pagination">
+            <span className="hint">
+              Showing {users.length} of {hasMore ? `${users.length}+` : users.length}
+            </span>
+            {hasMore && (
+              <button type="button" className="btn btn-secondary" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
+            )}
           </div>
         </div>
       )}
