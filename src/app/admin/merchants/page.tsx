@@ -2,7 +2,7 @@
 import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiPost, API_BASE } from "@/lib/api";
 
 type RiskTier = "unverified" | "standard" | "established" | "enterprise";
 
@@ -30,25 +30,22 @@ function shortAddress(address: string | null): string {
 export default function AdminMerchantsPage() {
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  async function load() {
-    setLoadError(false);
-    try {
-      const data = await apiFetch<Merchant[]>("/admin/merchants");
-      if (data === null) {
-        setLoadError(true);
-      } else {
-        setMerchants(data);
-      }
-    } catch (err) {
-      console.error("[konfirm admin] merchants load failed", err);
-      setLoadError(true);
-    } finally {
-      setLoading(false);
+  const PAGE_SIZE = 50;
+
+  async function load(offset = 0) {
+    const res = await fetch(`${API_BASE}/admin/merchants?limit=${PAGE_SIZE}&offset=${offset}`, {
+      credentials: "include",
+    });
+    if (res.ok) {
+      const page: Merchant[] = await res.json();
+      setMerchants((prev) => (offset === 0 ? page : [...prev, ...page]));
     }
+    setLoading(false);
+    setLoadingMore(false);
   }
 
   useEffect(() => {
@@ -56,6 +53,11 @@ export default function AdminMerchantsPage() {
       await load();
     })();
   }, []);
+
+  async function loadMore() {
+    setLoadingMore(true);
+    await load(merchants.length);
+  }
 
   async function sendPasswordReset(merchant: Merchant) {
     if (!window.confirm(`Email a password-reset link to ${merchant.email}?`)) return;
@@ -90,7 +92,11 @@ export default function AdminMerchantsPage() {
   async function toggleStatus(merchant: Merchant) {
     const nextStatus = merchant.status === "suspended" ? "active" : "suspended";
     const verb = nextStatus === "suspended" ? "suspend" : "reactivate";
-    if (!window.confirm(`${verb === "suspend" ? "Suspend" : "Reactivate"} ${merchant.name} (${merchant.email})?`)) return;
+    const confirmMessage =
+      nextStatus === "suspended"
+        ? `Suspend ${merchant.name} (${merchant.email})?\n\nWhile suspended, this merchant cannot sign in to the dashboard or receive new payments; their existing links stop accepting payments until they're reactivated.`
+        : `Reactivate ${merchant.name} (${merchant.email})?\n\nThis restores their ability to sign in and accept payments.`;
+    if (!window.confirm(confirmMessage)) return;
 
     let reason: string | null = "";
     if (verb === "suspend") {
@@ -190,6 +196,7 @@ export default function AdminMerchantsPage() {
                     </td>
                     <td>
                       <select
+                        aria-label="Risk tier"
                         value={m.risk_tier}
                         disabled={pendingId === m.id}
                         onChange={(e) => changeTier(m, e.target.value as RiskTier)}
@@ -222,6 +229,19 @@ export default function AdminMerchantsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {!loading && merchants.length > 0 && (
+          <div className="admin-pagination">
+            <span>
+              Showing {merchants.length} merchant{merchants.length === 1 ? "" : "s"}
+              {merchants.length % PAGE_SIZE === 0 ? " — there may be more" : ""}
+            </span>
+            {merchants.length % PAGE_SIZE === 0 && (
+              <button type="button" disabled={loadingMore} onClick={loadMore}>
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
+            )}
           </div>
         )}
         {error && <div className="status error">{error}</div>}

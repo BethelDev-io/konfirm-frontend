@@ -120,6 +120,7 @@ export default function AdminReconcilerPage() {
               type="text"
               placeholder="a Horizon paging token, or 'now'"
               autoComplete="off"
+              spellCheck={false}
               value={target}
               onChange={(e) => setTarget(e.target.value)}
             />

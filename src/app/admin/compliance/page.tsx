@@ -108,6 +108,7 @@ export default function AdminCompliancePage() {
             type="text"
             placeholder="G..."
             autoComplete="off"
+            spellCheck={false}
             value={address}
             onChange={(e) => setAddress(e.target.value)}
           />

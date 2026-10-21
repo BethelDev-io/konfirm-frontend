@@ -54,7 +54,9 @@ export default function AdminBlockchainPage() {
             <div className={`stat-value ${status.rpc.reachable ? "stat-good" : "stat-bad"}`} style={{ fontSize: 20 }}>
               {status.rpc.reachable ? "reachable" : "unreachable"}
             </div>
-            {status.rpc.reachable && <div className="stat-sub">{status.rpc.latencyMs}ms</div>}
+            {status.rpc.reachable && status.rpc.latencyMs !== null && (
+              <div className="stat-sub">{status.rpc.latencyMs}ms</div>
+            )}
           </div>
           <div className="stat-card">
             <div className="stat-label">Latest ledger</div>

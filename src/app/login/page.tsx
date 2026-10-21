@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { API_BASE } from "@/lib/api";
@@ -12,6 +12,25 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Already-authenticated visitors shouldn't see the login form — bounce
+  // them straight to the app instead.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
+        if (!cancelled && res.ok) {
+          router.replace("/activity");
+        }
+      } catch {
+        // Ignore — just means we stay on the login page.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -50,6 +69,7 @@ export default function LoginPage() {
               id="email"
               type="email"
               autoComplete="email"
+              autoFocus
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
