@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiPost } from "@/lib/api";
@@ -8,10 +8,55 @@ import { reportError } from "@/lib/reportError";
 import { useRequireAuth } from "@/lib/useAuth";
 
 const RECENT_LINK_KEY = "konfirm:recentLink";
+const DRAFT_KEY = "konfirm:newPaymentDraft";
+
+const COPY_FEEDBACK_MS = 4000;
 
 type Currency = "XLM" | "USDC" | "EURC";
 
 const CURRENCY_SYMBOLS: Record<Currency, string> = { XLM: "", USDC: "$", EURC: "€" };
+
+// Accepts pasted real-world price text — currency symbols/whitespace,
+// US grouping ("$1,234.56") and EU grouping ("1.234,56" or "1 234,56") —
+// and returns the numeric value, or null if it still isn't a valid number.
+// Previously a plain `Number(...)` call rejected any of this with the same
+// generic "enter an amount" error as truly empty input.
+function parseAmount(raw: string): number | null {
+  let s = raw.trim().replace(/[^0-9.,\s-]/g, "").trim();
+  if (!s) return null;
+
+  const lastComma = s.lastIndexOf(",");
+  const lastDot = s.lastIndexOf(".");
+
+  if (lastComma > -1 && lastDot > -1) {
+    // Whichever separator appears last is the decimal point.
+    if (lastComma > lastDot) {
+      s = s.replace(/\./g, "").replace(",", ".");
+    } else {
+      s = s.replace(/,/g, "");
+    }
+  } else if (lastComma > -1) {
+    // Only commas: decimal comma (EU) if exactly one with 1-2 digits after
+    // it, otherwise thousands separators.
+    const parts = s.split(",");
+    if (parts.length === 2 && parts[1].length <= 2) {
+      s = s.replace(",", ".");
+    } else {
+      s = s.replace(/,/g, "");
+    }
+  } else if (lastDot > -1) {
+    const parts = s.split(".");
+    if (parts.length > 2) {
+      // Multiple dots: thousands separators (EU style, e.g. "1.234.567").
+      s = s.replace(/\./g, "");
+    }
+    // Single dot: already a valid decimal point, leave as-is.
+  }
+
+  s = s.replace(/\s/g, "");
+  const num = Number(s);
+  return Number.isFinite(num) ? num : null;
+}
 
 interface Merchant {
   name: string;
@@ -31,14 +76,56 @@ export default function NewPaymentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [copyLabel, setCopyLabel] = useState("Copy");
+  const [copyAnnouncement, setCopyAnnouncement] = useState("");
   const [showResult, setShowResult] = useState(false);
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Restore draft from sessionStorage on mount
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw) as { amount?: string; currency?: Currency; description?: string };
+        if (draft.amount) setAmount(draft.amount);
+        if (draft.currency && (["XLM", "USDC", "EURC"] as Currency[]).includes(draft.currency)) setCurrency(draft.currency);
+        if (draft.description) setDescription(draft.description);
+      }
+    } catch {
+      // sessionStorage unavailable or corrupt — start blank
+    }
+  }, []);
+
+  // Persist draft to sessionStorage on change, debounced
+  useEffect(() => {
+    if (showResult) return;
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      try {
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ amount, currency, description }));
+      } catch {
+        // sessionStorage unavailable — ignore
+      }
+    }, 300);
+    return () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    };
+  }, [amount, currency, description, showResult]);
 
   async function handleSubmit() {
     const amountRaw = amount.trim();
     setStatus("");
 
-    const amountNum = Number(amountRaw);
-    if (!amountRaw || !Number.isFinite(amountNum) || amountNum <= 0) {
+    if (!amountRaw) {
+      setStatus("Enter an amount greater than 0.");
+      return;
+    }
+
+    const amountNum = parseAmount(amountRaw);
+    if (amountNum === null) {
+      setStatus("Enter a valid amount, like 1234.56.");
+      return;
+    }
+    if (amountNum <= 0) {
       setStatus("Enter an amount greater than 0.");
       return;
     }
@@ -67,6 +154,11 @@ export default function NewPaymentPage() {
       } catch {
         // localStorage may be unavailable (private mode, quota); the link is still shown.
       }
+      try {
+        sessionStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // sessionStorage unavailable — ignore
+      }
     } catch (err) {
       reportError(err, { tags: { area: "new-payment", action: "create-link" } });
       setStatus(err instanceof Error ? err.message : "Something went wrong. Please try again.");
@@ -80,7 +172,11 @@ export default function NewPaymentPage() {
       await navigator.clipboard.writeText(linkUrl);
       setStatus("");
       setCopyLabel("Copied");
-      setTimeout(() => setCopyLabel("Copy"), 1500);
+      setCopyAnnouncement("Link copied to clipboard.");
+      setTimeout(() => {
+        setCopyLabel("Copy");
+        setCopyAnnouncement("");
+      }, COPY_FEEDBACK_MS);
     } catch (err) {
       console.error("[konfirm new-payment] clipboard", err);
       setStatus("Couldn't copy — select and copy the link manually.");
@@ -91,6 +187,11 @@ export default function NewPaymentPage() {
     setAmount("");
     setDescription("");
     setShowResult(false);
+    try {
+      sessionStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // sessionStorage unavailable — ignore
+    }
   }
 
   return (
@@ -175,6 +276,9 @@ export default function NewPaymentPage() {
               <button type="button" onClick={handleCopy}>
                 {copyLabel}
               </button>
+            </div>
+            <div role="status" aria-live="polite" aria-atomic="true" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap" }}>
+              {copyAnnouncement}
             </div>
             <div className={`status${status ? " error" : ""}`}>{status}</div>
             <button type="button" className="primary" onClick={() => window.location.assign(linkUrl)}>

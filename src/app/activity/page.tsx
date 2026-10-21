@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { API_BASE, apiPost } from "@/lib/api";
 import { useRequireAuth } from "@/lib/useAuth";
@@ -39,8 +39,12 @@ interface Merchant {
   stellar_base_address: string | null;
 }
 
+// net_usdc is always a USD-equivalent value from the reconciler — for
+// non-USDC payments it is FX-converted, not the native amount paid (#127).
+// Render it as a USD figure with the originating asset noted, never as a
+// native-currency amount.
 function formatAmount(amount: number, code: string): string {
-  return code === "USDC" ? `$${amount.toFixed(2)}` : `${amount.toFixed(2)} ${code}`;
+  return code === "USDC" ? `$${amount.toFixed(2)}` : `$${amount.toFixed(2)} (paid in ${code})`;
 }
 
 // The dashboard is only ever the logged-in merchant's own data. There's no
@@ -48,11 +52,28 @@ function formatAmount(amount: number, code: string): string {
 // so an unauthenticated visitor sees nothing.
 function ActivityContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isAdminPreview = Boolean(searchParams.get("admin_preview"));
   const { resolved, data: merchant } = useRequireAuth<Merchant>({
     meEndpoint: "/auth/me",
     loginPath: "/login",
     select: (body) => (body as { merchant: Merchant }).merchant,
   });
+  // Gate render on auth resolution — prevents a false "$0.00 received"
+  // from flashing before the first fetch completes (#135).
+  if (!resolved) {
+    return (
+      <div className="wrap">
+        <div className="header-row">
+          <div className="brand">
+            <span className="mark">✓</span> Konfirm
+          </div>
+        </div>
+        <div className="empty">Loading…</div>
+      </div>
+    );
+  }
+
   const hasAddress = Boolean(merchant?.stellar_base_address);
   const showNav = Boolean(merchant);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -112,6 +133,26 @@ function ActivityContent() {
 
   return (
     <div className="wrap">
+      {isAdminPreview && (
+        <div
+          role="banner"
+          style={{
+            background: "var(--warn, #b45309)",
+            color: "#fff",
+            padding: "10px 16px",
+            fontWeight: 600,
+            fontSize: 13,
+            borderRadius: 6,
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <span>⚠</span>
+          Admin preview — you are viewing this merchant&apos;s dashboard as an admin. This session is read-only and has been logged.
+        </div>
+      )}
       <div className="header-row">
         <div className="brand">
           <span className="mark">✓</span> Konfirm
@@ -121,6 +162,8 @@ function ActivityContent() {
             <Link href="/new">+ New payment</Link>
             <Link href="/links">My links</Link>
             <Link href="/cashout">Cash out</Link>
+            <Link href="/referrals">Referrals</Link>
+            <Link href="/docs">Docs</Link>
             <button type="button" onClick={handleLogout}>
               Log out
             </button>

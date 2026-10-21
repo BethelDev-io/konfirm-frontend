@@ -36,8 +36,12 @@ function formatDate(iso: string): string {
   return formatUtc(iso);
 }
 
+// amount_usdc is always a USD-equivalent from the reconciler — for non-USDC
+// payments it is FX-converted, not the native amount paid (#127).
 function formatAmount(amount: string, code: string): string {
-  return code === "USDC" ? `$${Number(amount).toFixed(2)}` : `${Number(amount).toFixed(2)} ${code}`;
+  return code === "USDC"
+    ? `$${Number(amount).toFixed(2)}`
+    : `$${Number(amount).toFixed(2)} (paid in ${code})`;
 }
 
 function shortAddress(address: string): string {
