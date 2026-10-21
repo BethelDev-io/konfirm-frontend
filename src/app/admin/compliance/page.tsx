@@ -1,4 +1,5 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useEffect, useState, type FormEvent } from "react";
 import { apiFetch, apiPost } from "@/lib/api";
@@ -11,9 +12,6 @@ interface BlockedAddress {
   blocked_by_name: string | null;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
 
 export default function AdminCompliancePage() {
   const [blocked, setBlocked] = useState<BlockedAddress[]>([]);
@@ -23,6 +21,7 @@ export default function AdminCompliancePage() {
   const [submitting, setSubmitting] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState(false);
 
   async function load() {
     try {
@@ -58,7 +57,7 @@ export default function AdminCompliancePage() {
       setReason("");
       await load();
     } catch (err) {
-      console.error("[konfirm admin] block address failed", err);
+      reportError(err, { tags: { area: "admin-compliance", action: "block-address" } });
       setError(err instanceof Error ? err.message : "Could not block this address.");
     } finally {
       setSubmitting(false);
@@ -73,7 +72,7 @@ export default function AdminCompliancePage() {
       await apiFetch(`/admin/compliance/blocked-addresses/${entry.id}`, { method: "DELETE" });
       await load();
     } catch (err) {
-      console.error("[konfirm admin] unblock address failed", err);
+      reportError(err, { tags: { area: "admin-compliance", action: "unblock-address" } });
       setError(err instanceof Error ? err.message : "Could not unblock this address.");
     } finally {
       setPendingId(null);
@@ -96,6 +95,7 @@ export default function AdminCompliancePage() {
             type="text"
             placeholder="G..."
             autoComplete="off"
+            spellCheck={false}
             value={address}
             onChange={(e) => setAddress(e.target.value)}
           />
@@ -112,7 +112,9 @@ export default function AdminCompliancePage() {
 
       <div className="admin-section">
         {loading ? (
-          <div className="empty">Loading…</div>
+          <LoadingSpinner />
+        ) : loadError ? (
+          <div className="empty">Could not load blocked addresses — try again.</div>
         ) : blocked.length === 0 ? (
           <div className="empty">No addresses blocked.</div>
         ) : (
@@ -133,7 +135,7 @@ export default function AdminCompliancePage() {
                     <td className="mono">{b.stellar_address}</td>
                     <td>{b.reason || "—"}</td>
                     <td>{b.blocked_by_name || "—"}</td>
-                    <td>{formatDate(b.created_at)}</td>
+                    <td>{formatUtcTimestamp(b.created_at)}</td>
                     <td>
                       <button type="button" disabled={pendingId === b.id} onClick={() => handleUnblock(b)}>
                         Unblock

@@ -1,7 +1,9 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
+import { formatAmount } from "@/lib/format";
 
 interface Stats {
   merchants: { total: number; active: number; suspended: number; pending: number };
@@ -26,9 +28,6 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
-function formatUsd(value: string): string {
-  return `$${Number(value).toFixed(2)}`;
-}
 
 function dayLabel(dateStr: string): string {
   return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "short" });
@@ -54,8 +53,23 @@ function VolumeChart({ points }: { points: { date: string; net_usdc: string }[] 
   const linePath = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x},${y}`).join(" ");
   const areaPath = `${linePath} L${coords[coords.length - 1][0]},${height} L${coords[0][0]},${height} Z`;
 
+  const summary =
+    points.length === 0
+      ? "No volume data for the last 7 days."
+      : `Payment volume over the last ${points.length} days, from ${formatUsd(
+          points[0].net_usdc,
+        )} on ${dayLabel(points[0].date)} to ${formatUsd(
+          points[points.length - 1].net_usdc,
+        )} on ${dayLabel(points[points.length - 1].date)}.`;
+
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="volume-chart" preserveAspectRatio="none">
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="volume-chart"
+      preserveAspectRatio="none"
+      role="img"
+      aria-label={summary}
+    >
       <path d={areaPath} className="volume-chart-fill" />
       <path d={linePath} className="volume-chart-line" />
       {coords.map(([x, y], i) => (
@@ -65,24 +79,50 @@ function VolumeChart({ points }: { points: { date: string; net_usdc: string }[] 
   );
 }
 
+// Screen-reader-only table of the same data the chart draws, so the per-day
+// values are available to assistive technology rather than only visually.
+function VolumeTable({ points }: { points: { date: string; net_usdc: string }[] }) {
+  return (
+    <table className="visually-hidden">
+      <caption>Payment volume, last 7 days</caption>
+      <thead>
+        <tr>
+          <th scope="col">Date</th>
+          <th scope="col">Net volume (USDC)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {points.map((p) => (
+          <tr key={p.date}>
+            <th scope="row">{p.date}</th>
+            <td>{formatUsd(p.net_usdc)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 export default function AdminOverviewPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activityError, setActivityError] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const [statsRes, activityRes] = await Promise.all([
-        fetch(`${API_BASE}/admin/stats`, { credentials: "include" }),
-        fetch(`${API_BASE}/admin/activity`, { credentials: "include" }),
+      const [statsResult, activityResult] = await Promise.all([
+        apiFetch<Stats>("/admin/stats"),
+        apiFetch<ActivityEntry[]>("/admin/activity"),
       ]);
-      if (statsRes.ok) setStats(await statsRes.json());
-      if (activityRes.ok) setActivity(await activityRes.json());
+      if (statsResult.data) setStats(statsResult.data);
+      if (activityResult.data) setActivity(activityResult.data);
+      else setActivityError(true);
       setLoading(false);
     })();
   }, []);
 
-  if (loading) return <div className="empty">Loading…</div>;
+  if (loading) return <LoadingSpinner />;
   if (!stats) return <div className="empty">Could not load stats.</div>;
 
   return (
@@ -106,7 +146,7 @@ export default function AdminOverviewPage() {
           <div className="stat-card">
             <div className="stat-label">Payments today</div>
             <div className="stat-value">{stats.payments.today_count}</div>
-            <div className="stat-sub">{formatUsd(stats.payments.today_net_usdc)} net</div>
+            <div className="stat-sub">{formatAmount(stats.payments.today_net_usdc, "USDC")} net</div>
           </div>
           <div className="stat-card">
             <div className="stat-label">Blocked addresses</div>
@@ -127,10 +167,11 @@ export default function AdminOverviewPage() {
       </div>
 
       <div className="admin-section">
-        <h2>Payment volume, last 7 days ({formatUsd(stats.payments.last_7d_net_usdc)} total)</h2>
+        <h2>Payment volume, last 7 days ({formatAmount(stats.payments.last_7d_net_usdc, "USDC")} total)</h2>
         <div className="chart-card">
           <VolumeChart points={stats.daily_volume} />
-          <div className="chart-labels">
+          <VolumeTable points={stats.daily_volume} />
+          <div className="chart-labels" aria-hidden="true">
             {stats.daily_volume.map((p) => (
               <span key={p.date}>{dayLabel(p.date)}</span>
             ))}
@@ -140,14 +181,16 @@ export default function AdminOverviewPage() {
 
       <div className="admin-section">
         <h2>Recent activity</h2>
-        {activity.length === 0 ? (
+        {activityError ? (
+          <div className="empty">Could not load activity — try again.</div>
+        ) : activity.length === 0 ? (
           <div className="empty">No admin actions yet.</div>
         ) : (
           <ul className="activity-feed">
             {activity.map((a) => (
               <li key={a.id}>
                 <span className="when">{formatDate(a.created_at)}</span>
-                <span className="who">{a.admin_name}</span> {a.action.replace(".", " ")} {a.target_type} {a.target_id.slice(0, 8)}
+                <span className="who">{a.admin_name}</span> {a.action.replaceAll(".", " ")} {a.target_type} {a.target_id.slice(0, 8)}
                 {a.detail?.reason && <> — &ldquo;{a.detail.reason}&rdquo;</>}
               </li>
             ))}
