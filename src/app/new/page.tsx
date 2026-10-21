@@ -254,9 +254,9 @@ export default function NewPaymentPage() {
               />
               <div className="chips">
                 {["Gift", "Payment", "Service"].map((fill) => (
-                  <div key={fill} className="chip" onClick={() => setDescription(fill)}>
+                  <button key={fill} type="button" className="chip" onClick={() => setDescription(fill)}>
                     {fill}
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>

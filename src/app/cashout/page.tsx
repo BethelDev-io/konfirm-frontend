@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import freighterApi from "@stellar/freighter-api";
 import { API_BASE } from "@/lib/api";
 import { useRequireAuth } from "@/lib/useAuth";
 import { reportError } from "@/lib/reportError";
@@ -93,14 +92,13 @@ export default function CashoutPage() {
     const prep = await prepRes.json();
     if (!prepRes.ok) throw new Error(prep.message || "could not prepare the transfer");
 
-    signingInFlight.current = true;
-    try {
-      showProgress("Approve the transfer in your wallet…");
-      const signed = await freighterApi.signTransaction(prep.xdr, {
-        networkPassphrase: prep.network_passphrase,
-        address: merchantAddress.current!,
-      });
-      if (signed.error) throw new Error(signed.error);
+    showProgress("Approve the transfer in your wallet…");
+    const { default: freighterApi } = await import("@stellar/freighter-api");
+    const signed = await freighterApi.signTransaction(prep.xdr, {
+      networkPassphrase: prep.network_passphrase,
+      address: merchantAddress.current!,
+    });
+    if (signed.error) throw new Error(signed.error);
 
       showProgress("Sending your cash-out…");
       const submitRes = await fetch(`${HORIZON_URL}/transactions`, {
@@ -165,6 +163,7 @@ export default function CashoutPage() {
     cancelled.current = false;
     try {
       setStatus("Connecting your wallet…");
+      const { default: freighterApi } = await import("@stellar/freighter-api");
       const access = await freighterApi.requestAccess();
       if (access.error) throw new Error(access.error);
 

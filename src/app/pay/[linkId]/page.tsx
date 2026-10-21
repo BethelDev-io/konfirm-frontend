@@ -1,8 +1,6 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
-import type { Metadata } from "next";
-import freighterApi from "@stellar/freighter-api";
 import qrcode from "qrcode-generator";
 import { API_BASE } from "@/lib/api";
 import { formatAmount } from "@/lib/format";
@@ -179,17 +177,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
     broadcastRef.current?.postMessage({ type: "paying" });
     try {
       setStatusMsg(STAGE.CONNECT);
-      // When the Freighter extension isn't installed, requestAccess()
-      // never resolves at all (there's no content script to answer its
-      // postMessage) rather than rejecting, so the UI would otherwise hang
-      // forever on "Connecting...". Race it against a short timeout and
-      // surface a normal, actionable error instead.
-      const access = await Promise.race([
-        freighterApi.requestAccess(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Freighter wallet not detected")), 3000)
-        ),
-      ]);
+      const { default: freighterApi } = await import("@stellar/freighter-api");
+      const access = await freighterApi.requestAccess();
       if (access.error) throw new Error(access.error);
       const payerAddress = access.address;
 

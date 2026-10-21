@@ -245,6 +245,10 @@ button.secondary {
 }
 .ctoggle {
   width: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   padding: 8px 20px;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -354,6 +358,10 @@ input.amount-input:focus {
   flex-wrap: wrap;
 }
 .chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   padding: 6px 14px;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -529,6 +537,10 @@ a.txlink {
 .nav a,
 .nav button {
   width: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   font-size: 13px;
   color: var(--text-lo);
   text-decoration: none;
@@ -536,7 +548,7 @@ a.txlink {
   border: none;
   cursor: pointer;
   font-family: inherit;
-  padding: 0;
+  padding: 10px 4px;
 }
 .nav a:hover,
 .nav button:hover {
