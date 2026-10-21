@@ -59,7 +59,11 @@ export default function AdminTreasuryPage() {
           <div className="stat-card">
             <div className="stat-label">USDC balance</div>
             <div className={`stat-value ${status.reachable ? "" : "stat-bad"}`}>
-              {status.reachable ? `$${status.usdc_balance}` : "unreachable"}
+              {status.reachable
+                ? status.usdc_balance !== null
+                  ? `$${status.usdc_balance}`
+                  : "—"
+                : "unreachable"}
             </div>
           </div>
           <div className="stat-card">
