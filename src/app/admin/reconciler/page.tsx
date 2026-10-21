@@ -1,4 +1,5 @@
 "use client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 import { useEffect, useState, type FormEvent } from "react";
 import { API_BASE } from "@/lib/api";
@@ -97,7 +98,7 @@ export default function AdminReconcilerPage() {
 
       <div className="admin-section">
         {loading ? (
-          <div className="empty">Loading…</div>
+          <LoadingSpinner />
         ) : (
           <div className="admin-status-row">
             <div>
@@ -119,6 +120,7 @@ export default function AdminReconcilerPage() {
               type="text"
               placeholder="a Horizon paging token, or 'now'"
               autoComplete="off"
+              spellCheck={false}
               value={target}
               onChange={(e) => setTarget(e.target.value)}
             />
