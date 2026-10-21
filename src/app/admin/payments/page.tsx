@@ -50,7 +50,10 @@ function shortAddress(address: string): string {
 
 export default function AdminPaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [filter, setFilter] = useState<"" | PaymentStatus>("");
+  const [filter, setFilter] = useState<"" | PaymentStatus>(() => {
+    if (typeof window === "undefined") return "";
+    return (sessionStorage.getItem("admin-payments-filter") as "" | PaymentStatus) || "";
+  });
   const [loading, setLoading] = useState(true);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -73,6 +76,7 @@ export default function AdminPaymentsPage() {
   }
 
   useEffect(() => {
+    sessionStorage.setItem("admin-payments-filter", filter);
     (async () => {
       await load(filter);
     })();

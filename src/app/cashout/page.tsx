@@ -201,7 +201,7 @@ export default function CashoutPage() {
       if (!startRes.ok) throw new Error(startBody.message || "could not start a cash-out");
 
       signingInFlight.current = false;
-      window.open(startBody.url, "konfirm-cashout", "width=460,height=700");
+      window.open(startBody.url, "konfirm-cashout", "width=460,height=700,noopener,noreferrer");
       pollStatus(tokenBody.token, startBody.id);
     } catch (err) {
       signingInFlight.current = false;

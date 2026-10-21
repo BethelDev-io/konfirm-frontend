@@ -33,11 +33,18 @@ function shortAddress(address: string): string {
 
 export default function AdminX402SettlementsPage() {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
-  const [filter, setFilter] = useState<"" | SettlementStatus>("");
+  const [filter, setFilter] = useState<"" | SettlementStatus>(() => {
+    if (typeof window === "undefined") return "";
+    return (sessionStorage.getItem("admin-x402-settlements-filter") as "" | SettlementStatus) || "";
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  async function load(status: "" | SettlementStatus = filter) {
+  useEffect(() => {
+    sessionStorage.setItem("admin-x402-settlements-filter", filter);
+  }, [filter]);
+
+  async function load() {
     setLoading(true);
     setError(false);
     const result = await apiFetch<Settlement[]>(

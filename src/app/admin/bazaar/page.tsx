@@ -28,7 +28,10 @@ function formatDate(iso: string | null): string {
 
 export default function AdminBazaarPage() {
   const [listings, setListings] = useState<Listing[]>([]);
-  const [filter, setFilter] = useState<"" | ListingStatus>("pending");
+  const [filter, setFilter] = useState<"" | ListingStatus>(() => {
+    if (typeof window === "undefined") return "pending";
+    return (sessionStorage.getItem("admin-bazaar-filter") as "" | ListingStatus) ?? "pending";
+  });
   const [loading, setLoading] = useState(true);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +51,7 @@ export default function AdminBazaarPage() {
   }
 
   useEffect(() => {
+    sessionStorage.setItem("admin-bazaar-filter", filter);
     (async () => {
       await load(filter);
     })();

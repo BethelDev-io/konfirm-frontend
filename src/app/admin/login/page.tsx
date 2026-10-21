@@ -49,6 +49,7 @@ export default function AdminLoginPage() {
               id="email"
               type="email"
               autoComplete="email"
+              autoFocus
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
