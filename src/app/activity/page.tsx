@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { API_BASE, apiPost } from "@/lib/api";
 import { useRequireAuth } from "@/lib/useAuth";
 import { formatAmount } from "@/lib/format";
 import FeeSettlement from "@/components/fee-settlement";
+
+type PaymentStatus = "paid" | "held" | "refunded" | "disputed";
 
 interface Payment {
   id: string;
@@ -14,12 +16,30 @@ interface Payment {
   asset_code: string;
   payer_address: string;
   link_description: string | null;
-  status: "paid" | "held" | "refunded" | "disputed";
+  status: PaymentStatus;
   flag_reason: string | null;
   fee_status: "none" | "collected" | "owed" | "claimed" | "settled";
   fee_owed_raw: string | null;
   fee_asset_code: string | null;
+  created_at: string;
 }
+
+const STATUS_FILTERS: Array<{ value: "all" | PaymentStatus; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "paid", label: "Paid" },
+  { value: "held", label: "Held" },
+  { value: "refunded", label: "Refunded" },
+  { value: "disputed", label: "Disputed" },
+];
+
+type DateRangePreset = "all" | "7" | "30" | "90";
+
+const DATE_RANGE_FILTERS: Array<{ value: DateRangePreset; label: string }> = [
+  { value: "all", label: "All time" },
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
+  { value: "90", label: "Last 90 days" },
+];
 
 // Plain-language reasons for an admin-review hold, shown to the merchant.
 // Anything unrecognised falls back to a neutral line rather than leaking an
@@ -71,8 +91,10 @@ function ActivityContent() {
   const showNav = Boolean(merchant);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [pending, setPending] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | PaymentStatus>("all");
+  const [dateFilter, setDateFilter] = useState<DateRangePreset>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [now, setNow] = useState<number | null>(null);
 
   const poll = useCallback(async () => {
     if (!hasAddress) return;
@@ -85,6 +107,7 @@ function ActivityContent() {
     const pendingBody = await pendingRes.json();
     setPayments(paymentsBody);
     setPending(Boolean(pendingBody.pending));
+    setNow(Date.now());
   }, [hasAddress]);
 
   // The recursive scheduling lives here, in a plain local function, rather
@@ -122,7 +145,15 @@ function ActivityContent() {
     });
   const hasBalances = Object.keys(totals).length > 0;
 
-  const filteredPayments = statusFilter === "all" ? payments : payments.filter((p) => p.status === statusFilter);
+  const filteredPayments = useMemo(() => {
+    const reference = now ?? 0;
+    const dateCutoff = dateFilter === "all" ? null : reference - Number(dateFilter) * 24 * 60 * 60 * 1000;
+    return payments.filter((p) => {
+      if (statusFilter !== "all" && p.status !== statusFilter) return false;
+      if (dateCutoff !== null && new Date(p.created_at).getTime() < dateCutoff) return false;
+      return true;
+    });
+  }, [payments, statusFilter, dateFilter, now]);
 
   return (
     <div className="wrap">
@@ -185,130 +216,117 @@ function ActivityContent() {
           </>
         )}
       </div>
+      {hasAddress && payments.length > 0 && (
+        <div className="header-row" style={{ gap: 12, flexWrap: "wrap" }}>
+          <div className="field">
+            <label htmlFor="status-filter">Status</label>
+            <select
+              id="status-filter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | PaymentStatus)}
+            >
+              {STATUS_FILTERS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="date-filter">Date range</label>
+            <select id="date-filter" value={dateFilter} onChange={(e) => setDateFilter(e.target.value as DateRangePreset)}>
+              {DATE_RANGE_FILTERS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
       <div>
         {resolved && !hasAddress && <div className="empty">No Stellar address on file yet.</div>}
         {hasAddress && payments.length === 0 && !pending && (
           <div className="empty">No payments yet — this updates the instant one lands.</div>
         )}
-        {hasAddress && payments.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <label htmlFor="status-filter" style={{ marginRight: 8, fontSize: 14 }}>
-              Filter by status:
-            </label>
-            <select
-              id="status-filter"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ fontSize: 14, padding: "2px 6px" }}
-            >
-              <option value="all">All</option>
-              <option value="paid">Paid</option>
-              <option value="held">Held</option>
-              <option value="refunded">Refunded</option>
-              <option value="disputed">Disputed</option>
-            </select>
-            {statusFilter !== "all" && (
-              <span style={{ marginLeft: 12, fontSize: 13, opacity: 0.7 }}>
-                {filteredPayments.length} of {payments.length} payments
-              </span>
-            )}
-          </div>
+        {hasAddress && payments.length > 0 && filteredPayments.length === 0 && (
+          <div className="empty">No payments match this filter.</div>
         )}
-        {filteredPayments.map((p) => (
-          <div key={p.id}>
+        {filteredPayments.map((p) => {
+          const isExpanded = expandedId === p.id;
+          return (
             <div
               className="payment"
-              onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
-              style={{ cursor: "pointer" }}
+              key={p.id}
               role="button"
-              aria-expanded={expandedId === p.id}
               tabIndex={0}
+              aria-expanded={isExpanded}
+              onClick={() => setExpandedId(isExpanded ? null : p.id)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") setExpandedId(expandedId === p.id ? null : p.id);
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setExpandedId(isExpanded ? null : p.id);
+                }
               }}
+              style={{ cursor: "pointer", flexDirection: "column", alignItems: "stretch" }}
             >
-              <div className="left">
-                <div className="tick">✓</div>
-                <div className="desc">
-                  {p.link_description || "Payment"}
-                  <div className="from">
-                    from {p.payer_address.slice(0, 4)}…{p.payer_address.slice(-4)}
-                  </div>
-                  {p.fee_status === "owed" && p.fee_owed_raw && (
+              <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                <div className="left">
+                  <div className="tick">✓</div>
+                  <div className="desc">
+                    {p.link_description || "Payment"}
                     <div className="from">
-                      Fee owed {p.fee_owed_raw} {p.fee_asset_code}
+                      from {p.payer_address.slice(0, 4)}…{p.payer_address.slice(-4)}
+                    </div>
+                    {p.fee_status === "owed" && p.fee_owed_raw && (
+                      <div className="from">
+                        Fee owed {p.fee_owed_raw} {p.fee_asset_code}
+                      </div>
+                    )}
+                    {p.status === "held" && (
+                      <div className="from" role="status">
+                        {HOLD_REASON_TEXT[p.flag_reason ?? ""] ?? HOLD_FALLBACK}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="amount">
+                  {p.status === "held" ? "On hold" : formatAmount(Number(p.net_usdc), p.asset_code)}
+                </div>
+              </div>
+              {isExpanded && (
+                <div className="from" style={{ marginTop: 12, width: "100%", lineHeight: 1.8 }}>
+                  <div>
+                    <strong>Payment ID:</strong> <span className="mono">{p.id}</span>
+                  </div>
+                  <div>
+                    <strong>Status:</strong> {p.status}
+                  </div>
+                  <div>
+                    <strong>Date:</strong> {new Date(p.created_at).toLocaleString()}
+                  </div>
+                  <div>
+                    <strong>Payer address:</strong> <span className="mono">{p.payer_address}</span>
+                  </div>
+                  <div>
+                    <strong>Amount:</strong> {formatAmount(Number(p.net_usdc), p.asset_code)}
+                  </div>
+                  {p.fee_status !== "none" && (
+                    <div>
+                      <strong>Fee status:</strong> {p.fee_status}
+                      {p.fee_owed_raw && ` (${p.fee_owed_raw} ${p.fee_asset_code})`}
                     </div>
                   )}
                   {p.status === "held" && (
-                    <div className="from" role="status">
-                      {HOLD_REASON_TEXT[p.flag_reason ?? ""] ?? HOLD_FALLBACK}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="amount">
-                {p.status === "held" ? "On hold" : formatAmount(Number(p.net_usdc), p.asset_code)}
-              </div>
-            </div>
-            {expandedId === p.id && (
-              <div
-                style={{
-                  background: "var(--card-bg, #f9f9f9)",
-                  border: "1px solid var(--border, #e0e0e0)",
-                  borderTop: "none",
-                  borderRadius: "0 0 6px 6px",
-                  padding: "12px 16px",
-                  fontSize: 13,
-                }}
-              >
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 24px" }}>
-                  <div>
-                    <strong>Payment ID</strong>
-                    <div className="mono" style={{ fontSize: 12, wordBreak: "break-all" }}>
-                      {p.id}
-                    </div>
-                  </div>
-                  <div>
-                    <strong>Status</strong>
-                    <div>{p.status}</div>
-                  </div>
-                  <div>
-                    <strong>Payer address</strong>
-                    <div className="mono" style={{ fontSize: 12, wordBreak: "break-all" }}>
-                      {p.payer_address}
-                    </div>
-                  </div>
-                  <div>
-                    <strong>Asset</strong>
-                    <div>{p.asset_code}</div>
-                  </div>
-                  <div>
-                    <strong>Amount</strong>
-                    <div>{p.status === "held" ? "On hold" : formatAmount(Number(p.net_usdc), p.asset_code)}</div>
-                  </div>
-                  <div>
-                    <strong>Fee status</strong>
-                    <div>{p.fee_status}</div>
-                  </div>
-                  {p.fee_status === "owed" && p.fee_owed_raw && (
                     <div>
-                      <strong>Fee owed</strong>
-                      <div>
-                        {p.fee_owed_raw} {p.fee_asset_code}
-                      </div>
-                    </div>
-                  )}
-                  {p.status === "held" && p.flag_reason && (
-                    <div style={{ gridColumn: "1 / -1" }}>
-                      <strong>Hold reason</strong>
-                      <div>{HOLD_REASON_TEXT[p.flag_reason] ?? HOLD_FALLBACK}</div>
+                      <strong>Hold reason:</strong> {HOLD_REASON_TEXT[p.flag_reason ?? ""] ?? HOLD_FALLBACK}
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

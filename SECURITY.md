@@ -4,7 +4,7 @@ Konfirm handles real fund custody paths — if you find a security issue, please
 
 ## Reporting
 
-Use GitHub's private vulnerability reporting (Security tab → Report a vulnerability) on the relevant repo, or email the maintainers directly if you have their contact.
+Use GitHub's private vulnerability reporting (Security tab → Report a vulnerability) on this repository.
 
 ## Scope
 
@@ -12,11 +12,6 @@ Use GitHub's private vulnerability reporting (Security tab → Report a vulnerab
 - Authorization in the Soroban contracts (compliance, payment, treasury, channel)
 - Authentication and session handling (merchant and admin)
 - Payment verdict / reconciliation correctness
-
-## Out of scope
-
-- Theoretical attacks with no practical impact
-- Issues already publicly known or previously reported
 
 ## Response
 
