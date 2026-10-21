@@ -89,7 +89,13 @@ export default function LoginPage() {
           <button type="submit" className="primary" disabled={submitting}>
             Log in
           </button>
-          <div className={`status${status ? " error" : ""}`}>{status}</div>
+          <div
+            className={`status${status ? " error" : ""}`}
+            role="alert"
+            aria-live={status ? "assertive" : "polite"}
+          >
+            {status}
+          </div>
         </form>
         <div className="footer">
           <Link href="/forgot-password">Forgot your password?</Link>

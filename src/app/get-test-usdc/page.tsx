@@ -203,7 +203,13 @@ export default function GetTestUsdcPage() {
             <button type="button" className="primary" disabled={connecting} onClick={handleConnect}>
               Connect Freighter &amp; get test USDC
             </button>
-            <div className={`status${status1 ? " error" : ""}`}>{status1}</div>
+            <div
+              className={`status${status1 ? " error" : ""}`}
+              role="alert"
+              aria-live={status1 ? "assertive" : "polite"}
+            >
+              {status1}
+            </div>
           </div>
         )}
 
@@ -229,7 +235,13 @@ export default function GetTestUsdcPage() {
             <button type="button" className="primary" disabled={sending} onClick={handleSend}>
               Send USDC
             </button>
-            <div className={`status${status2 ? " error" : ""}`}>{status2}</div>
+            <div
+              className={`status${status2 ? " error" : ""}`}
+              role="alert"
+              aria-live={status2 ? "assertive" : "polite"}
+            >
+              {status2}
+            </div>
           </div>
         )}
 

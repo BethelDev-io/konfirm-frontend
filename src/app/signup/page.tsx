@@ -42,6 +42,11 @@ function SignupForm() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    const addressTrimmed = address.trim();
+    if (!/^G[A-Z2-7]{55}$/.test(addressTrimmed)) {
+      setStatus("Enter a valid Stellar G... address.");
+      return;
+    }
     setSubmitting(true);
     setStatus("");
     try {
@@ -53,7 +58,7 @@ function SignupForm() {
           name,
           email,
           password,
-          stellar_base_address: address.trim(),
+          stellar_base_address: addressTrimmed,
           ...(referralCode ? { referral_code: referralCode } : {}),
         }),
       });
@@ -136,7 +141,13 @@ function SignupForm() {
           <button type="submit" className="primary" disabled={submitting}>
             Create account
           </button>
-          <div className={`status${status ? " error" : ""}`}>{status}</div>
+          <div
+            className={`status${status ? " error" : ""}`}
+            role="alert"
+            aria-live={status ? "assertive" : "polite"}
+          >
+            {status}
+          </div>
         </form>
         <div className="footer">
           Already have an account? <Link href="/login">Log in</Link>

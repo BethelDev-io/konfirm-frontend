@@ -268,7 +268,13 @@ export default function NewPaymentPage() {
             <button type="button" className="primary" disabled={submitting} onClick={handleSubmit}>
               Create payment link
             </button>
-            <div className={`status${status ? " error" : ""}`}>{status}</div>
+            <div
+              className={`status${status ? " error" : ""}`}
+              role="alert"
+              aria-live={status ? "assertive" : "polite"}
+            >
+              {status}
+            </div>
           </div>
         ) : (
           <div className="success-box">
