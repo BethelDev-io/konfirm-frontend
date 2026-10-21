@@ -47,7 +47,9 @@ export default function AdminX402SettlementsPage() {
   async function load() {
     setLoading(true);
     setError(false);
-    const result = await apiFetch<Settlement[]>("/admin/x402-settlements");
+    const result = await apiFetch<Settlement[]>(
+      status ? `/admin/x402-settlements?status=${status}` : "/admin/x402-settlements",
+    );
     if (result.ok && result.data) {
       setSettlements(result.data);
     } else {
@@ -58,9 +60,9 @@ export default function AdminX402SettlementsPage() {
 
   useEffect(() => {
     (async () => {
-      await load();
+      await load(filter);
     })();
-  }, []);
+  }, [filter]);
 
   const counts = {
     settled: settlements.filter((s) => s.status === "settled").length,
