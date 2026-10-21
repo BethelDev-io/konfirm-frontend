@@ -80,8 +80,8 @@ export default function NewPaymentPage() {
   const [showResult, setShowResult] = useState(false);
   const inFlight = useRef(false);
 
-  async function handleSubmit() {
-    if (inFlight.current) return;
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     const amountRaw = amount.trim();
     setStatus("");
 
@@ -188,7 +188,7 @@ export default function NewPaymentPage() {
         </div>
 
         {!showResult ? (
-          <div>
+          <form onSubmit={handleSubmit}>
             <h1>Request a payment</h1>
             <p className="sub">
               {merchant?.name ? `Create a link you can send anyone — from ${merchant.name}.` : "Create a link you can send anyone."}
@@ -239,17 +239,11 @@ export default function NewPaymentPage() {
               </div>
             </div>
 
-            <button type="button" className="primary" disabled={submitting} onClick={handleSubmit}>
+            <button type="submit" className="primary" disabled={submitting}>
               Create payment link
             </button>
-            <div
-              className={`status${status ? " error" : ""}`}
-              role="alert"
-              aria-live={status ? "assertive" : "polite"}
-            >
-              {status}
-            </div>
-          </div>
+            <div className={`status${status ? " error" : ""}`}>{status}</div>
+          </form>
         ) : (
           <div className="success-box">
             <div className="tick">✓</div>
