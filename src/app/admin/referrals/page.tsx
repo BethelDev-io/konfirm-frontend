@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 interface ReferralRow {
   id: string;
@@ -66,6 +66,8 @@ export default function AdminReferralsPage() {
 
       {loading ? (
         <div className="empty">Loading…</div>
+      ) : error ? (
+        <div className="empty">Could not load referrals — try again.</div>
       ) : referrals.length === 0 ? (
         <div className="empty">No referrals yet.</div>
       ) : (
@@ -98,7 +100,7 @@ export default function AdminReferralsPage() {
                         {r.activated ? "Active" : "Signed up"}
                       </span>
                     </td>
-                    <td>{formatDate(r.created_at)}</td>
+                    <td>{formatUtcTimestamp(r.created_at)}</td>
                   </tr>
                 ))}
               </tbody>

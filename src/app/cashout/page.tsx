@@ -5,6 +5,8 @@ import Link from "next/link";
 import freighterApi from "@stellar/freighter-api";
 import { API_BASE } from "@/lib/api";
 import { useRequireAuth } from "@/lib/useAuth";
+import { reportError } from "@/lib/reportError";
+import { useBeforeUnload } from "@/lib/useBeforeUnload";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 type Currency = "XLM" | "USDC";
@@ -51,6 +53,8 @@ export default function CashoutPage() {
   const merchantAddress = useRef<string | null>(null);
   const cancelled = useRef(false);
   const paymentSubmitted = useRef(false);
+  const signingInFlight = useRef(false);
+  useBeforeUnload(signingInFlight);
 
   // Ref mutation (not React state) in response to an external value
   // arriving — the one part of the original effect that's genuinely
@@ -89,29 +93,40 @@ export default function CashoutPage() {
     const prep = await prepRes.json();
     if (!prepRes.ok) throw new Error(prep.message || "could not prepare the transfer");
 
-    showProgress("Approve the transfer in your wallet…");
-    const signed = await freighterApi.signTransaction(prep.xdr, {
-      networkPassphrase: prep.network_passphrase,
-      address: merchantAddress.current!,
-    });
-    if (signed.error) throw new Error(signed.error);
+    signingInFlight.current = true;
+    try {
+      showProgress("Approve the transfer in your wallet…");
+      const signed = await freighterApi.signTransaction(prep.xdr, {
+        networkPassphrase: prep.network_passphrase,
+        address: merchantAddress.current!,
+      });
+      if (signed.error) throw new Error(signed.error);
 
-    showProgress("Sending your cash-out…");
-    const submitRes = await fetch(`${HORIZON_URL}/transactions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `tx=${encodeURIComponent(signed.signedTxXdr)}`,
-    });
-    const submitResult = await submitRes.json();
-    if (!submitRes.ok) {
-      const codes = submitResult.extras?.result_codes;
-      throw new Error(codes ? JSON.stringify(codes) : submitResult.title || "submission failed");
+      showProgress("Sending your cash-out…");
+      const submitRes = await fetch(`${HORIZON_URL}/transactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `tx=${encodeURIComponent(signed.signedTxXdr)}`,
+      });
+      const submitResult = await submitRes.json();
+      if (!submitRes.ok) {
+        const codes = submitResult.extras?.result_codes;
+        throw new Error(codes ? JSON.stringify(codes) : submitResult.title || "submission failed");
+      }
+    } finally {
+      signingInFlight.current = false;
     }
   }
 
   async function pollStatus(token: string, id: string) {
     while (!cancelled.current) {
-      const res = await fetch(`${API_BASE}/withdrawals/status?token=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`);
+      // Always-fresh read: this loop polls withdrawal status, so a
+      // cached/stale response could keep showing "pending" after the
+      // withdrawal has actually completed or failed.
+      const res = await fetch(
+        `${API_BASE}/withdrawals/status?token=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`,
+        { cache: "no-store" },
+      );
       const txn = await res.json().catch(() => ({}));
       if (!res.ok) {
         showFormError(friendlyMessage(new Error(txn.message)));
@@ -132,7 +147,7 @@ export default function CashoutPage() {
         try {
           await sendWithdrawalPayment(token, id);
         } catch (err) {
-          console.error("[konfirm cashout] withdrawal payment failed", err);
+          reportError(err, { tags: { flow: "cashout", stage: "withdrawal_payment" } });
           showFormError(friendlyMessage(err));
           return;
         }
@@ -158,6 +173,7 @@ export default function CashoutPage() {
       const challenge = await challengeRes.json();
       if (!challengeRes.ok) throw new Error(challenge.message || "could not reach the cash-out partner");
 
+      signingInFlight.current = true;
       showProgress("Approve the sign-in in your wallet…");
       const signedChallenge = await freighterApi.signTransaction(challenge.transaction, {
         networkPassphrase: challenge.network_passphrase,
@@ -184,10 +200,12 @@ export default function CashoutPage() {
       const startBody = await startRes.json();
       if (!startRes.ok) throw new Error(startBody.message || "could not start a cash-out");
 
-      window.open(startBody.url, "konfirm-cashout", "width=460,height=700");
+      signingInFlight.current = false;
+      window.open(startBody.url, "konfirm-cashout", "width=460,height=700,noopener,noreferrer");
       pollStatus(tokenBody.token, startBody.id);
     } catch (err) {
-      console.error("[konfirm cashout]", err);
+      signingInFlight.current = false;
+      reportError(err, { tags: { flow: "cashout", stage: "start" } });
       showFormError(friendlyMessage(err));
     }
   }
@@ -221,6 +239,7 @@ export default function CashoutPage() {
                   key={c}
                   type="button"
                   className={`ctoggle${currency === c ? " active" : ""}`}
+                  aria-pressed={currency === c}
                   onClick={() => setCurrency(c)}
                 >
                   {c}
@@ -247,7 +266,7 @@ export default function CashoutPage() {
         {view === "success" && (
           <div className="success-box">
             <div className="tick">✓</div>
-            <div className="success-title">Cash-out complete</div>
+            <h1 className="success-title">Cash-out complete</h1>
             <div className="success-detail">Your funds are on their way to your bank.</div>
             <button type="button" className="secondary" onClick={handleAnother}>
               Start another cash-out

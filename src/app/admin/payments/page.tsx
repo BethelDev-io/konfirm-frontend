@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
+import { formatAmount } from "@/lib/format";
 
 type PaymentStatus = "paid" | "held" | "disputed";
 
@@ -33,11 +34,7 @@ const FLAG_LABEL: Record<string, string> = {
 };
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
-
-function formatAmount(amount: string, code: string): string {
-  return code === "USDC" ? `$${Number(amount).toFixed(2)}` : `${Number(amount).toFixed(2)} ${code}`;
+  return formatUtc(iso);
 }
 
 function shortAddress(address: string): string {
@@ -48,7 +45,10 @@ const PAGE_SIZE = 50;
 
 export default function AdminPaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [filter, setFilter] = useState<"" | PaymentStatus>("");
+  const [filter, setFilter] = useState<"" | PaymentStatus>(() => {
+    if (typeof window === "undefined") return "";
+    return (sessionStorage.getItem("admin-payments-filter") as "" | PaymentStatus) || "";
+  });
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -85,6 +85,7 @@ export default function AdminPaymentsPage() {
   }
 
   useEffect(() => {
+    sessionStorage.setItem("admin-payments-filter", filter);
     (async () => {
       await load(filter);
     })();
@@ -92,20 +93,33 @@ export default function AdminPaymentsPage() {
 
   async function changeStatus(payment: Payment, status: PaymentStatus) {
     if (status === payment.status) return;
-    let reason: string | null = "";
-    if (status !== "paid") {
-      reason = window.prompt(`Reason for marking this payment "${status}" (optional, shown in the activity log):`, "");
-      if (reason === null) return;
+
+    const flagDescription = payment.flag_reason
+      ? FLAG_LABEL[payment.flag_reason] ?? payment.flag_reason
+      : null;
+    const consequence =
+      status === "paid" && (payment.status === "disputed" || payment.status === "held")
+        ? `This will clear the "${payment.status}" flag${flagDescription ? ` (${flagDescription})` : ""} and mark the payment as paid.`
+        : `This will change the payment status from "${payment.status}" to "${status}".`;
+    if (!window.confirm(`${consequence}\n\nAre you sure?`)) return;
+
+    const reason = window.prompt(
+      `Reason for marking this payment "${status}" (required, shown in the activity log):`,
+      ""
+    );
+    if (reason === null) return;
+    if (!reason.trim()) {
+      setError("A reason is required for every payment status change.");
+      return;
     }
 
     setPendingId(payment.id);
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/admin/payments/${payment.id}/status`, {
+      const res = await apiFetch(`${API_BASE}/admin/payments/${payment.id}/status`, {
         method: "PATCH",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, reason: reason || undefined }),
+        body: JSON.stringify({ status, reason: reason.trim() }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -113,7 +127,7 @@ export default function AdminPaymentsPage() {
       }
       await load(filter);
     } catch (err) {
-      console.error("[konfirm admin] payment status change failed", err);
+      reportError(err, { scope: "admin-payments", action: "payment-status-change", paymentId: payment.id });
       setError(err instanceof Error ? err.message : "Could not update this payment.");
     } finally {
       setPendingId(null);
@@ -141,6 +155,8 @@ export default function AdminPaymentsPage() {
       <div className="admin-section">
         {loading ? (
           <div className="empty">Loading…</div>
+        ) : error && payments.length === 0 ? (
+          <div className="empty">Could not load payments — try again.</div>
         ) : payments.length === 0 ? (
           <div className="empty">No payments match this filter.</div>
         ) : (
@@ -163,7 +179,7 @@ export default function AdminPaymentsPage() {
                       <div style={{ color: "var(--text-hi)" }}>{p.merchant_name}</div>
                       <div className="mono">{p.merchant_email}</div>
                     </td>
-                    <td className="mono">{formatAmount(p.amount_usdc, p.asset_code)}</td>
+                    <td className="mono">{formatAmount(p.amount_usdc, p.asset_code, "en-US")}</td>
                     <td className="mono">{shortAddress(p.payer_address)}</td>
                     <td>
                       <span className={`status-pill ${p.status}`}>{p.status}</span>

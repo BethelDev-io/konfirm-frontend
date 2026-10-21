@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 // Every backend call goes through the same-origin proxy configured in
 // next.config.ts — never a direct cross-origin call to the NestJS server.
 export const API_BASE = "/api/backend";
@@ -5,7 +7,10 @@ export const API_BASE = "/api/backend";
 export interface ApiSuccess<T> {
   ok: true;
   status: number;
-  data: T;
+  // `data` is `T | null` because a 2xx response with an empty or non-JSON
+  // body parses to `null` (see `apiFetch`). Callers must handle the null
+  // case rather than assuming `data` is always present.
+  data: T | null;
 }
 
 export interface ApiFailure {
@@ -27,6 +32,13 @@ export type ApiResult<T> = ApiSuccess<T> | ApiFailure;
 // given the right content-type automatically; a non-JSON response body
 // (none exist today, but `res.json()` throwing shouldn't crash the caller)
 // degrades to `body: null` rather than throwing.
+//
+// NOTE: on a 2xx response, `data` is typed `T | null` — an empty or
+// non-JSON body parses to `null` (via `.catch(() => null)`), so callers must
+// not assume `data` is non-null. Treat a null `data` on a 2xx response as a
+// failed/empty result (e.g. guard with `if (!result.data) ...`) before
+// accessing nested fields; TypeScript will flag unchecked `.data.<field>`
+// access on an `ApiResult`.
 export async function apiFetch<T = unknown>(path: string, init: RequestInit = {}): Promise<ApiResult<T>> {
   const { body, headers, credentials, ...rest } = init;
   const isJsonBody = typeof body === "string" || (body !== undefined && !(body instanceof FormData));

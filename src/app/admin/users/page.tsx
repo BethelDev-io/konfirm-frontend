@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/api";
+import { formatAmount } from "@/lib/format";
 
 interface UserRow {
   payer_address: string;
@@ -11,10 +12,6 @@ interface UserRow {
   last_seen_at: string;
   refunded_count: string;
   disputed_count: string;
-}
-
-function formatUsdc(amount: string): string {
-  return `$${Number(amount).toFixed(2)}`;
 }
 
 function formatDate(iso: string): string {
@@ -71,6 +68,8 @@ export default function AdminUsersPage() {
 
       {loading ? (
         <div className="empty">Loading…</div>
+      ) : error ? (
+        <div className="empty">Could not load users — try again.</div>
       ) : users.length === 0 ? (
         <div className="empty">No payer activity yet.</div>
       ) : (
@@ -83,8 +82,8 @@ export default function AdminUsersPage() {
                   <th>Payments</th>
                   <th>Total volume</th>
                   <th>Refunded / disputed</th>
-                  <th>First seen</th>
-                  <th>Last seen</th>
+                  <th>First seen (UTC)</th>
+                  <th>Last seen (UTC)</th>
                 </tr>
               </thead>
               <tbody>
@@ -92,12 +91,12 @@ export default function AdminUsersPage() {
                   <tr key={u.payer_address}>
                     <td className="mono">{shortAddress(u.payer_address)}</td>
                     <td className="mono">{u.payment_count}</td>
-                    <td className="mono">{formatUsdc(u.total_volume_usdc)}</td>
+                    <td className="mono">{formatAmount(u.total_volume_usdc, "USDC")}</td>
                     <td className="mono">
                       {u.refunded_count} / {u.disputed_count}
                     </td>
-                    <td>{formatDate(u.first_seen_at)}</td>
-                    <td>{formatDate(u.last_seen_at)}</td>
+                    <td>{formatUtcTimestamp(u.first_seen_at)}</td>
+                    <td>{formatUtcTimestamp(u.last_seen_at)}</td>
                   </tr>
                 ))}
               </tbody>

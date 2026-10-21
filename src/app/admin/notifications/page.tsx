@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatUtcTimestamp } from "@/lib/format";
 
 type Severity = "critical" | "warning" | "info";
 
@@ -13,8 +14,24 @@ interface Notification {
   created_at: string;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
+const KNOWN_SEVERITIES: readonly Severity[] = ["critical", "warning", "info"];
+
+function isKnownSeverity(value: unknown): value is Severity {
+  return typeof value === "string" && (KNOWN_SEVERITIES as readonly string[]).includes(value);
+}
+
+function severityPillClass(severity: string): string {
+  switch (severity) {
+    case "critical":
+      return "failed";
+    case "warning":
+      return "held";
+    case "info":
+      return "active";
+    default:
+      // Unrecognized severity: never fall through to the success/active styling.
+      return "unknown";
+  }
 }
 
 const PAGE_SIZE = 50;
@@ -51,6 +68,7 @@ export default function AdminNotificationsPage() {
 
   const critical = items.filter((n) => n.severity === "critical").length;
   const warning = items.filter((n) => n.severity === "warning").length;
+  const unknown = items.filter((n) => !isKnownSeverity(n.severity)).length;
 
   return (
     <div>
@@ -76,12 +94,18 @@ export default function AdminNotificationsPage() {
             <div className="stat-label">Warning</div>
             <div className="stat-value">{warning}</div>
           </div>
+          <div className="stat-card">
+            <div className="stat-label">Unknown</div>
+            <div className="stat-value">{unknown}</div>
+          </div>
         </div>
       </div>
 
       <div className="admin-section">
         {loading ? (
           <div className="empty">Loading…</div>
+        ) : error ? (
+          <div className="empty">Could not load notifications — try again.</div>
         ) : items.length === 0 ? (
           <div className="empty">Nothing to flag right now.</div>
         ) : (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 interface WalletRow {
   address: string;
@@ -62,6 +62,8 @@ export default function AdminWalletsPage() {
 
       {loading ? (
         <div className="empty">Loading…</div>
+      ) : error ? (
+        <div className="empty">Could not load wallets — try again.</div>
       ) : wallets.length === 0 ? (
         <div className="empty">No addresses seen yet.</div>
       ) : (

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch, apiPatch } from "@/lib/api";
+import { formatUtcTimestamp } from "@/lib/format";
 
 type ListingStatus = "pending" | "approved" | "rejected";
 
@@ -22,32 +23,55 @@ interface Listing {
 const STATUS_OPTIONS: ListingStatus[] = ["pending", "approved", "rejected"];
 
 function formatDate(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString() : "—";
+  return iso ? formatUtcTimestamp(iso) : "—";
 }
 
 export default function AdminBazaarPage() {
   const [listings, setListings] = useState<Listing[]>([]);
-  const [filter, setFilter] = useState<"" | ListingStatus>("pending");
+  const [filter, setFilter] = useState<"" | ListingStatus>(() => {
+    if (typeof window === "undefined") return "pending";
+    return (sessionStorage.getItem("admin-bazaar-filter") as "" | ListingStatus) ?? "pending";
+  });
   const [loading, setLoading] = useState(true);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function load(status: string) {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
+    setError(null);
     const result = await apiFetch<Listing[]>(status ? `/admin/bazaar-listings?status=${status}` : "/admin/bazaar-listings");
-    if (result.ok) setListings(result.data);
+    if (result.ok && result.data) {
+      setListings(result.data);
+    } else {
+      setListings([]);
+      setError(result.ok ? "Could not load listings — try again." : result.message || "Could not load listings — try again.");
+    }
     setLoading(false);
   }
 
   useEffect(() => {
+    sessionStorage.setItem("admin-bazaar-filter", filter);
     (async () => {
       await load(filter);
     })();
   }, [filter]);
 
   async function handleReview(listing: Listing, status: "approved" | "rejected") {
+    if (status === "approved") {
+      const confirmed = window.confirm(
+        `Approve "${listing.name || listing.url}"? This publishes the listing to the public discovery manifest (/.well-known/x402-bazaar.json), making it visible to other agents.`
+      );
+      if (!confirmed) return;
+    }
     setPendingId(listing.id);
+    setError(null);
     try {
-      await apiPatch(`/admin/bazaar-listings/${listing.id}/status`, { status });
+      const result = await apiPatch(`/admin/bazaar-listings/${listing.id}/status`, { status });
+      if (!result.ok) {
+        setError(result.message || `Could not ${status === "approved" ? "approve" : "reject"} listing — try again.`);
+        return;
+      }
       await load(filter);
     } finally {
       setPendingId(null);
@@ -74,9 +98,13 @@ export default function AdminBazaarPage() {
         ))}
       </div>
 
+      {error && <div className="empty">{error}</div>}
+
       <div className="admin-section">
         {loading ? (
           <div className="empty">Loading…</div>
+        ) : error ? (
+          <div className="empty">Could not load listings — try again.</div>
         ) : listings.length === 0 ? (
           <div className="empty">No listings match this filter.</div>
         ) : (
@@ -90,7 +118,7 @@ export default function AdminBazaarPage() {
                   <th>Network</th>
                   <th>Contact</th>
                   <th>Status</th>
-                  <th>Submitted</th>
+                  <th>Submitted (UTC)</th>
                   <th></th>
                 </tr>
               </thead>

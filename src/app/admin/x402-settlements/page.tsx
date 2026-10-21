@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatAmount as formatCurrencyAmount } from "@/lib/format";
 
 type SettlementStatus = "settled" | "failed" | "held";
 
@@ -19,15 +20,11 @@ interface Settlement {
 
 const STATUS_OPTIONS: SettlementStatus[] = ["settled", "failed", "held"];
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
-}
-
 // x402 USDC amounts arrive in atomic units (7 decimals), unlike the
 // existing payments table's already-decimal amount_usdc.
 function formatAmount(amount: string): string {
   const n = Number(amount) / 10_000_000;
-  return Number.isFinite(n) ? `$${n.toFixed(2)}` : amount;
+  return Number.isFinite(n) ? formatCurrencyAmount(n, "USDC") : amount;
 }
 
 function shortAddress(address: string): string {
@@ -38,7 +35,10 @@ const PAGE_SIZE = 50;
 
 export default function AdminX402SettlementsPage() {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
-  const [filter, setFilter] = useState<"" | SettlementStatus>("");
+  const [filter, setFilter] = useState<"" | SettlementStatus>(() => {
+    if (typeof window === "undefined") return "";
+    return (sessionStorage.getItem("admin-x402-settlements-filter") as "" | SettlementStatus) || "";
+  });
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [offset, setOffset] = useState(0);
@@ -65,7 +65,7 @@ export default function AdminX402SettlementsPage() {
     (async () => {
       await load(0);
     })();
-  }, []);
+  }, [filter]);
 
   const counts = {
     settled: settlements.filter((s) => s.status === "settled").length,
@@ -118,6 +118,8 @@ export default function AdminX402SettlementsPage() {
       <div className="admin-section">
         {loading ? (
           <div className="empty">Loading…</div>
+        ) : error ? (
+          <div className="empty">Could not load settlements — try again.</div>
         ) : visible.length === 0 ? (
           <div className="empty">No settlements match this filter.</div>
         ) : (
