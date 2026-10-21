@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 interface WalletRow {
   address: string;
@@ -21,11 +21,17 @@ const ROLE_LABELS: Record<string, string> = {
 export default function AdminWalletsPage() {
   const [wallets, setWallets] = useState<WalletRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(`${API_BASE}/admin/wallets`, { credentials: "include" });
-      if (res.ok) setWallets(await res.json());
+      const data = await apiFetch<WalletRow[]>("/admin/wallets");
+      if (data) {
+        setWallets(data);
+        setError(false);
+      } else {
+        setError(true);
+      }
       setLoading(false);
     })();
   }, []);
@@ -40,6 +46,8 @@ export default function AdminWalletsPage() {
 
       {loading ? (
         <div className="empty">Loading…</div>
+      ) : error ? (
+        <div className="empty">Could not load wallets — try again.</div>
       ) : wallets.length === 0 ? (
         <div className="empty">No addresses seen yet.</div>
       ) : (

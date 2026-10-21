@@ -16,29 +16,51 @@ interface DailyRow {
 }
 
 function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString();
+  return `${new Date(iso).toLocaleDateString(undefined, { timeZone: "UTC" })} UTC`;
+}
+
+// Client-side CSV export from the already-loaded daily rows (#20).
+function downloadCsv(rows: DailyRow[]) {
+  const header = "Day (UTC),Payments,Fee Revenue (USD)";
+  const lines = rows.map((r) => `${r.day},${r.payment_count},${Number(r.fee_usdc).toFixed(2)}`);
+  const blob = new Blob([[header, ...lines].join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "fee-revenue.csv";
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function AdminFeeRevenuePage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [daily, setDaily] = useState<DailyRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const [summaryRes, dailyRes] = await Promise.all([
-        fetch(`${API_BASE}/admin/fee-revenue/summary`, { credentials: "include" }),
-        fetch(`${API_BASE}/admin/fee-revenue/daily`, { credentials: "include" }),
+      const [summaryData, dailyData] = await Promise.all([
+        apiFetch<Summary>("/admin/fee-revenue/summary"),
+        apiFetch<DailyRow[]>("/admin/fee-revenue/daily"),
       ]);
-      if (summaryRes.ok) setSummary(await summaryRes.json());
-      if (dailyRes.ok) setDaily(await dailyRes.json());
+      if (summaryData) setSummary(summaryData);
+      if (dailyData) setDaily(dailyData);
+      setError(!summaryData || !dailyData);
       setLoading(false);
     })();
   }, []);
 
   return (
     <div>
-      <h1>Fee Revenue</h1>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <h1>Fee Revenue</h1>
+        {!loading && daily.length > 0 && (
+          <button type="button" onClick={() => downloadCsv(daily)}>
+            Download CSV
+          </button>
+        )}
+      </div>
       <p className="hint">
         Realized fee revenue only counts payments that actually settled (status = paid) — a refunded or disputed
         payment&apos;s fee was never really earned, so it&apos;s excluded here.
@@ -62,14 +84,16 @@ export default function AdminFeeRevenuePage() {
           </div>
 
           <div className="admin-section">
-            {daily.length === 0 ? (
+            {error ? (
+              <div className="empty">Could not load fee revenue — try again.</div>
+            ) : daily.length === 0 ? (
               <div className="empty">No settled payments in the last 30 days.</div>
             ) : (
               <div className="admin-table-wrap">
                 <table className="admin-table">
                   <thead>
                     <tr>
-                      <th>Day</th>
+                      <th>Day (UTC)</th>
                       <th>Payments</th>
                       <th>Fee revenue</th>
                     </tr>

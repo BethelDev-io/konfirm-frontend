@@ -1,4 +1,5 @@
-"use client";
+import type { Metadata } from "next";
+import AdminShell from "./AdminShell";
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -24,6 +25,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/admin/payments", label: "Payments" },
       { href: "/admin/fee-revenue", label: "Fee Revenue" },
+      { href: "/admin/fees-owed", label: "Fees Owed" },
       { href: "/admin/exchange-rate", label: "Exchange Rate" },
       { href: "/admin/pay-links", label: "Pay Links" },
       { href: "/admin/x402-settlements", label: "x402 Settlements" },
@@ -51,7 +53,7 @@ const NAV_GROUPS = [
   },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isLoginPage = pathname === "/admin/login";

@@ -10,10 +10,7 @@ interface FacilitatorStatus {
   haltReason: string | null;
   spentTodayUsdc: number;
   capUsdc: number;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString();
+  capConfigured?: boolean;
 }
 
 export default function AdminFacilitatorPage() {
@@ -68,9 +65,15 @@ export default function AdminFacilitatorPage() {
 
       {error && <div className="status error">{error}</div>}
 
+      {!status.halted && (status.capConfigured === false || (status.capConfigured === undefined && status.capUsdc === 0)) && (
+        <div className="status error" style={{ marginBottom: 20 }}>
+          Daily spend cap not configured — the facilitator will halt on its next signing attempt.
+        </div>
+      )}
+
       {status.halted && (
         <div className="status error" style={{ marginBottom: 20 }}>
-          Halted{status.haltedAt ? ` since ${formatDate(status.haltedAt)}` : ""}
+          Halted{status.haltedAt ? ` since ${formatUtcTimestamp(status.haltedAt)}` : ""}
           {status.haltReason ? ` — ${status.haltReason}` : ""}
         </div>
       )}
