@@ -1,12 +1,9 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
-import type { Metadata } from "next";
-import freighterApi from "@stellar/freighter-api";
 import qrcode from "qrcode-generator";
 import { API_BASE } from "@/lib/api";
-import { reportError } from "@/lib/report-error";
-import { useBeforeUnload } from "@/lib/use-before-unload";
+import { formatAmount } from "@/lib/format";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 
@@ -86,6 +83,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
 
   const alreadyConfirmed = useRef(false);
   const sharedMuxedId = useRef<string | null>(null);
+  const broadcastRef = useRef<BroadcastChannel | null>(null);
   // True only while a payment is being signed/submitted/confirmed, so the
   // beforeunload prompt never fires during passive polling or idle states.
   const operationInFlight = useRef(false);
@@ -101,6 +99,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
     if (alreadyConfirmed.current) return; // either path can win; only act on the first
     alreadyConfirmed.current = true;
     setConfirmed(payment);
+    broadcastRef.current?.postMessage({ type: "confirmed" });
   }
 
   // Asks only about this payer's own session, so a checkout page never
@@ -174,8 +173,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
     connectInFlight.current = true;
     setConnecting(true);
     operationInFlight.current = true;
+    broadcastRef.current?.postMessage({ type: "paying" });
     try {
       setStatusMsg(STAGE.CONNECT);
+      const { default: freighterApi } = await import("@stellar/freighter-api");
       const access = await freighterApi.requestAccess();
       if (access.error) throw new Error(access.error);
       const payerAddress = access.address;
@@ -245,6 +246,25 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
     // must be able to confirm rather than silently no-op.
     alreadyConfirmed.current = false;
     sharedMuxedId.current = null;
+    setOtherSessionPaying(false);
+
+    // Same-browser cross-session awareness: a visitor who opens this same
+    // checkout link in two tabs (or two devices sync the tab) should see
+    // that someone is already paying, instead of two identical-looking
+    // checkouts racing each other silently. BroadcastChannel only reaches
+    // other tabs/windows of this same browser on this same origin — it
+    // can't see a genuinely different device's session, which would need
+    // a server-side link status check.
+    let channel: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== "undefined") {
+      channel = new BroadcastChannel(`konfirm-pay-${linkId}`);
+      broadcastRef.current = channel;
+      channel.onmessage = (event) => {
+        const msg = event.data as { type?: string };
+        if (msg?.type === "paying") setOtherSessionPaying(true);
+        if (msg?.type === "confirmed") setOtherSessionPaying(false);
+      };
+    }
 
     async function init() {
       const res = await fetch(`${API_BASE}/links/${linkId}/public`);
@@ -283,21 +303,18 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
     init();
     return () => {
       cancelledRef.current = true;
+      channel?.close();
+      broadcastRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkId]);
 
-  function formatCurrency(value: string, currency: string): string {
-    const str = Number(value).toFixed(2);
-    return currency === "USDC" ? `$${str}` : `${str} ${currency}`;
-  }
-
-  const amountDisplay = linkData ? formatCurrency(linkData.amount_usdc, linkData.currency) : "";
+  const amountDisplay = linkData ? formatAmount(linkData.amount_usdc, linkData.currency) : "";
   const feeUsdc = linkData?.fee_usdc ? Number(linkData.fee_usdc) : 0;
-  const feeDisplay = linkData && feeUsdc > 0 ? formatCurrency(linkData.fee_usdc as string, linkData.currency) : "";
+  const feeDisplay = linkData && feeUsdc > 0 ? formatAmount(linkData.fee_usdc as string, linkData.currency) : "";
   const totalDisplay =
     linkData && feeUsdc > 0
-      ? formatCurrency((Number(linkData.amount_usdc) + feeUsdc).toString(), linkData.currency)
+      ? formatAmount((Number(linkData.amount_usdc) + feeUsdc).toString(), linkData.currency)
       : "";
 
   return (
@@ -326,6 +343,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ linkId: str
               </>
             ) : (
               <div className="amount-display">{amountDisplay}</div>
+            )}
+
+            {otherSessionPaying && (
+              <div className="status" style={{ marginBottom: 12 }}>
+                This link is already being paid in another tab or window. You don&apos;t need to pay again.
+              </div>
             )}
 
             {showQr && (

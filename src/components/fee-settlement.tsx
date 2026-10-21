@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import freighterApi from "@stellar/freighter-api";
 import { API_BASE } from "@/lib/api";
 import { reportError } from "@/lib/report-error";
 
@@ -68,6 +67,7 @@ export default function FeeSettlement({ address }: { address: string }) {
       if (!created.ok) throw Object.assign(new Error(describeFailure(body)), { handled: true });
 
       setStatus({ text: "Approve the fee payment in your wallet…", error: false });
+      const { default: freighterApi } = await import("@stellar/freighter-api");
       const signed = await freighterApi.signTransaction(body.unsigned_xdr, {
         networkPassphrase: body.network_passphrase,
         address,
@@ -84,7 +84,9 @@ export default function FeeSettlement({ address }: { address: string }) {
       if (!submitted.ok) throw Object.assign(new Error(describeFailure(result)), { handled: true });
 
       setStatus({ text: "Fees settled. Thank you.", error: false });
-      await load();
+      await load().catch((refreshErr) => {
+        console.warn("[konfirm fees] totals refresh failed after successful settlement", refreshErr);
+      });
     } catch (err) {
       reportError(err, { tags: { area: "fee-settlement", action: "settle" } });
       setStatus({
