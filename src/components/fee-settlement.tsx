@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import freighterApi from "@stellar/freighter-api";
 import { API_BASE } from "@/lib/api";
+import { reportError } from "@/lib/report-error";
 
 // Merchant-side fee settlement (docs/design/qr-fee-collection.md, Option B).
 // Shows what the merchant owes, then clears it in one transaction they sign in
@@ -34,8 +34,11 @@ export default function FeeSettlement({ address }: { address: string }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ text: string; error: boolean } | null>(null);
 
+  // Always-fresh reads: this is a balance check (fees owed), so a
+  // cached/stale response could understate or overstate what's actually
+  // owed right now.
   const load = useCallback(async () => {
-    const res = await fetch(`${API_BASE}/fees/owed`);
+    const res = await fetch(`${API_BASE}/fees/owed`, { cache: "no-store" });
     if (res.ok) {
       const body: { totals: OwedTotal[] } = await res.json();
       setTotals(body.totals);
@@ -44,12 +47,12 @@ export default function FeeSettlement({ address }: { address: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/fees/owed`)
+    fetch(`${API_BASE}/fees/owed`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((body: { totals: OwedTotal[] } | null) => {
         if (!cancelled && body) setTotals(body.totals);
       })
-      .catch((err) => console.error("[konfirm fees] could not load owed fees", err));
+      .catch((err) => reportError(err, { tags: { area: "fee-settlement", action: "load-owed-fees" } }));
     return () => {
       cancelled = true;
     };
@@ -64,6 +67,7 @@ export default function FeeSettlement({ address }: { address: string }) {
       if (!created.ok) throw Object.assign(new Error(describeFailure(body)), { handled: true });
 
       setStatus({ text: "Approve the fee payment in your wallet…", error: false });
+      const { default: freighterApi } = await import("@stellar/freighter-api");
       const signed = await freighterApi.signTransaction(body.unsigned_xdr, {
         networkPassphrase: body.network_passphrase,
         address,
@@ -82,7 +86,7 @@ export default function FeeSettlement({ address }: { address: string }) {
       setStatus({ text: "Fees settled. Thank you.", error: false });
       await load();
     } catch (err) {
-      console.error("[konfirm fees] settlement failed", err);
+      reportError(err, { tags: { area: "fee-settlement", action: "settle" } });
       setStatus({
         text: err instanceof Error && (err as Error & { handled?: boolean }).handled
           ? err.message

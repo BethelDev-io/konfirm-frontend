@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import freighterApi from "@stellar/freighter-api";
 import { API_BASE } from "@/lib/api";
 import { useRequireAuth } from "@/lib/useAuth";
+import { reportError } from "@/lib/reportError";
+import { useBeforeUnload } from "@/lib/useBeforeUnload";
 
 const HORIZON_URL = "https://horizon-testnet.stellar.org";
 type Currency = "XLM" | "USDC";
@@ -51,6 +52,8 @@ export default function CashoutPage() {
   const merchantAddress = useRef<string | null>(null);
   const cancelled = useRef(false);
   const paymentSubmitted = useRef(false);
+  const signingInFlight = useRef(false);
+  useBeforeUnload(signingInFlight);
 
   // Ref mutation (not React state) in response to an external value
   // arriving — the one part of the original effect that's genuinely
@@ -103,6 +106,7 @@ export default function CashoutPage() {
 
     if (!merchantAddress.current) throw new Error("no Stellar address on file");
     showProgress("Approve the transfer in your wallet…");
+    const { default: freighterApi } = await import("@stellar/freighter-api");
     const signed = await freighterApi.signTransaction(prep.xdr, {
       networkPassphrase: prep.network_passphrase,
       address: merchantAddress.current,
@@ -176,6 +180,7 @@ export default function CashoutPage() {
     cancelled.current = false;
     try {
       setStatus("Connecting your wallet…");
+      const { default: freighterApi } = await import("@stellar/freighter-api");
       const access = await freighterApi.requestAccess();
       if (cancelled.current) return;
       if (access.error) throw new Error(access.error);
@@ -219,7 +224,8 @@ export default function CashoutPage() {
       if (cancelled.current) return;
       if (!startRes.ok) throw new Error(startBody.message || "could not start a cash-out");
 
-      window.open(startBody.url, "konfirm-cashout", "width=460,height=700");
+      signingInFlight.current = false;
+      window.open(startBody.url, "konfirm-cashout", "width=460,height=700,noopener,noreferrer");
       pollStatus(tokenBody.token, startBody.id);
     } catch (err) {
       if (cancelled.current) return;
@@ -257,6 +263,7 @@ export default function CashoutPage() {
                   key={c}
                   type="button"
                   className={`ctoggle${currency === c ? " active" : ""}`}
+                  aria-pressed={currency === c}
                   onClick={() => setCurrency(c)}
                 >
                   {c}
@@ -294,7 +301,7 @@ export default function CashoutPage() {
         {view === "success" && (
           <div className="success-box">
             <div className="tick">✓</div>
-            <div className="success-title">Cash-out complete</div>
+            <h1 className="success-title">Cash-out complete</h1>
             <div className="success-detail">Your funds are on their way to your bank.</div>
             <button type="button" className="secondary" onClick={handleAnother}>
               Start another cash-out

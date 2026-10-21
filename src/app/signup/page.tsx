@@ -1,13 +1,33 @@
 "use client";
 
-import { Suspense, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { API_BASE } from "@/lib/api";
+import { reportError } from "@/lib/report-error";
 
 function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Already-authenticated visitors shouldn't see the signup form — bounce
+  // them straight to the app instead.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
+        if (!cancelled && res.ok) {
+          router.replace("/activity");
+        }
+      } catch {
+        // Ignore — just means we stay on the signup page.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
   // Present only when someone arrived via another merchant's referral
   // link (see /referrals) — an invalid/expired code is rejected silently
   // server-side, not surfaced as an error here, since it should never
@@ -50,7 +70,7 @@ function SignupForm() {
       }
       router.push("/activity");
     } catch (err) {
-      console.error("[konfirm signup]", err);
+      reportError("signup", err);
       setStatus(err instanceof Error ? err.message : "Could not create your account. Please try again.");
       setSubmitting(false);
     }
@@ -75,6 +95,7 @@ function SignupForm() {
               id="name"
               type="text"
               autoComplete="organization"
+              autoFocus
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -110,6 +131,7 @@ function SignupForm() {
               id="address"
               type="text"
               placeholder="G..."
+              spellCheck={false}
               required
               value={address}
               onChange={(e) => setAddress(e.target.value)}
